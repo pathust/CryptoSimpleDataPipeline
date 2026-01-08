@@ -11,18 +11,23 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')
 from src.modules.extract.manager import ExtractionManager
 from src.modules.transform.manager import TransformManager
 from src.modules.visualize.service import VisualizeService
+from src.modules.analytics.service import AnalyticsService
 from src.scheduler_config import SchedulerConfig
 import src.config as config
 
 app = Flask(__name__)
 CORS(app)
 
-scheduler = BackgroundScheduler()
+# TEMPORARY: Disable APScheduler due to segfault in conda env
+# Scheduler can be triggered manually via /api/trigger endpoint
+# scheduler = BackgroundScheduler(daemon=False)
+scheduler = None
 scheduler_config = SchedulerConfig()
 
 extract_mgr = ExtractionManager()
 transform_mgr = TransformManager()
 visualize_svc = VisualizeService()
+analytics_svc = AnalyticsService()
 
 def pipeline_job():
     """Background job to run extraction and transformation."""
@@ -39,30 +44,28 @@ def pipeline_job():
         # Transform (includes auto-aggregation)
         records = transform_mgr.process_recent_files()
         print(f"✅ Transform: {records} records processed")
+        scheduler_config.mark_job_run("pipeline_job")
         
     except Exception as e:
         print(f"❌ Pipeline job failed: {e}")
+        import traceback
+        traceback.print_exc()
 
 def maintenance_job():
     """Weekly maintenance: archive, cleanup, aggregate."""
     print("🧹 Running weekly maintenance...")
     try:
         transform_mgr.run_maintenance()
+        scheduler_config.mark_job_run("maintenance_job")
     except Exception as e:
         print(f"❌ Maintenance failed: {e}")
+        import traceback
+        traceback.print_exc()
 
-# Start scheduler with initial interval
-initial_interval = scheduler_config.get_interval()
-scheduler.add_job(func=pipeline_job, trigger="interval", seconds=initial_interval, id='pipeline_job')
-
-# Add weekly maintenance (runs every Sunday at 2 AM)
-scheduler.add_job(func=maintenance_job, trigger="cron", day_of_week='sun', hour=2, id='maintenance_job')
-
-scheduler.start()
-
-print(f"⏰ Scheduler started:")
-print(f"   - Pipeline: {initial_interval}s interval")
-print(f"   - Maintenance: Weekly (Sunday 2AM)")
+# TEMPORARY: Scheduler disabled to prevent segfault
+# Use /api/trigger to run pipeline manually
+print("⚠️  Auto-scheduler disabled (segfault issue)")
+print("   Use POST /api/trigger to run pipeline manually")
 
 @app.route('/api/config/symbols', methods=['GET', 'POST'])
 def config_symbols():
@@ -266,6 +269,85 @@ def get_orderbook_table():
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+# ========== NEW ENDPOINTS FOR REACT FRONTEND ==========
+
+@app.route('/api/dashboard/metrics')
+def get_dashboard_metrics():
+    """Get dashboard metrics."""
+    metrics = visualize_svc.get_dashboard_metrics()
+    return jsonify(metrics)
+
+@app.route('/api/analytics/candlestick/<symbol>')
+def get_candlestick(symbol):
+    """Get candlestick data for analytics page."""
+    limit = request.args.get('limit', 200, type=int)
+    data = analytics_svc.get_candlestick_data(symbol, limit=limit)
+    return jsonify(data)
+
+@app.route('/api/analytics/orderbook/<symbol>')
+def get_orderbook_snapshot(symbol):
+    """Get orderbook snapshot for analytics page."""
+    limit = request.args.get('limit', 20, type=int)
+    data = analytics_svc.get_orderbook_snapshot(symbol, limit=limit)
+    return jsonify(data)
+
+@app.route('/api/pipeline/ingestion-logs')
+def get_ingestion_logs():
+    """Get ingestion logs with pagination."""
+    limit = request.args.get('limit', 50, type=int)
+    offset = request.args.get('offset', 0, type=int)
+    logs = visualize_svc.get_ingestion_logs(limit=limit, offset=offset)
+    return jsonify(logs)
+
+@app.route('/api/pipeline/deduplication-stats')
+def get_deduplication_stats():
+    """Get deduplication statistics."""
+    stats = visualize_svc.get_deduplication_stats()
+    return jsonify(stats)
+
+@app.route('/api/pipeline/storage-health')
+def get_storage_health():
+    """Get storage health metrics."""
+    health = visualize_svc.get_storage_health()
+    return jsonify(health)
+
+@app.route('/api/scheduler/jobs', methods=['GET'])
+def get_scheduler_jobs():
+    """Get all scheduled jobs."""
+    jobs = scheduler_config.get_all_jobs()
+    return jsonify(jobs)
+
+@app.route('/api/scheduler/jobs/<job_id>', methods=['PUT'])
+def update_scheduler_job(job_id):
+    """Update a specific job configuration."""
+    updates = request.json
+    success = scheduler_config.update_job(job_id, updates)
+    
+    if success and job_id == "pipeline_job" and "interval" in updates:
+        # Reschedule if interval changed
+        interval_str = updates["interval"]
+        new_interval = int(interval_str.rstrip('s'))
+        scheduler.reschedule_job(
+            'pipeline_job',
+            trigger='interval',
+            seconds=new_interval
+        )
+        print(f"⏰ Job {job_id} rescheduled to {new_interval}s")
+    
+    return jsonify({"status": "success" if success else "error"})
+
+@app.route('/api/scheduler/jobs/<job_id>/run', methods=['POST'])
+def run_scheduler_job(job_id):
+    """Manually trigger a specific job."""
+    if job_id == "pipeline_job":
+        pipeline_job()
+        return jsonify({"status": "Pipeline job triggered"})
+    elif job_id == "maintenance_job":
+        maintenance_job()
+        return jsonify({"status": "Maintenance job triggered"})
+    else:
+        return jsonify({"error": "Unknown job ID"}), 404
 
 if __name__ == '__main__':
     app.run(debug=config.FLASK_DEBUG, use_reloader=False, port=config.FLASK_PORT)

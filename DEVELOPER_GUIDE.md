@@ -38,10 +38,11 @@ The system follows a modular, decoupled architecture:
 ### Components
 
 **Frontend (SPA)**
-- Pure HTML/CSS/JavaScript
+- HTML with Tailwind CSS (CDN) and vanilla JavaScript
 - No build process required
-- Lightweight Charts for visualizations
+- Lightweight Charts for candlestick visualizations
 - Fetch API for backend communication
+- Multi-tab interface (Dashboard, Charts, Indicators, Data Tables, Scheduler, Settings)
 
 **Backend (Flask)**
 - RESTful API design
@@ -50,9 +51,17 @@ The system follows a modular, decoupled architecture:
 - MySQL for data persistence
 
 **Data Pipeline**
-- Extract: Binance API → JSON files
+- Extract: Binance API → JSON files (incremental)
 - Transform: JSON → MySQL (with deduplication)
 - Load: Fact tables + Aggregation tables
+
+**Frontend Tabs**
+- **Dashboard**: Real-time 24h statistics cards for all symbols
+- **Charts**: Interactive candlestick charts with Lightweight Charts
+- **Indicators**: Technical indicators (RSI, MACD, Bollinger Bands)
+- **Data Tables**: Paginated k-lines and orderbook data with CSV export
+- **Scheduler**: Configure pipeline intervals and manual triggers
+- **Settings**: Manage tracked cryptocurrency symbols
 
 ---
 
@@ -130,7 +139,7 @@ src/
 │   └── warehouse/
 │       └── aggregator.py       # WarehouseAggregator (hourly/daily)
 └── web/
-    └── app.py                  # Flask application
+    └── app.py                  # Flask application (16 endpoints)
 ```
 
 ### Design Patterns
@@ -272,6 +281,37 @@ def custom_endpoint(symbol):
         return jsonify(result)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+```
+
+### Adding a New Frontend Tab
+
+**1. Update HTML structure**
+
+```html
+<!-- frontend/index.html -->
+<!-- Add navigation item -->
+<li><a href="#" onclick="switchTab('mytab')"
+    class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-primary/10 text-gray-400">
+    📊 My Tab
+</a></li>
+
+<!-- Add tab content -->
+<div id="mytab-tab" class="tab-content hidden">
+    <div id="mytab-container"></div>
+</div>
+```
+
+**2. Add JavaScript handler**
+
+```javascript
+// frontend/app.js
+async function loadMyTab() {
+    const response = await fetch(`${API_BASE}/api/mydata`);
+    const data = await response.json();
+    document.getElementById('mytab-container').innerHTML = renderMyData(data);
+}
+
+// Update switchTab() to handle 'mytab'
 ```
 
 ---

@@ -1,27 +1,23 @@
-import http.server
-import socketserver
+import subprocess
 import os
-import sys
-
-# Add src to path to import config
-sys.path.append(os.path.abspath(os.path.dirname(__file__)))
-from src import config
-
-PORT = config.FRONTEND_PORT
-DIRECTORY = "frontend"
-
-class Handler(http.server.SimpleHTTPRequestHandler):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, directory=DIRECTORY, **kwargs)
 
 def run():
-    print(f"Starting Frontend on http://localhost:{PORT}")
-    with socketserver.TCPServer(("", PORT), Handler) as httpd:
-        try:
-            httpd.serve_forever()
-        except KeyboardInterrupt:
-            print("\nStopping Frontend...")
-            httpd.shutdown()
+    frontend_dir = os.path.join(os.path.dirname(__file__), 'frontend')
+    if not os.path.exists(frontend_dir):
+        print("❌ Frontend directory not found!")
+        return
+    
+    print("🚀 Starting Vite dev server...")
+    print("📡 Frontend: http://localhost:5173")
+    print("📡 Backend API: http://localhost:5001")
+    print()
+    print("Press Ctrl+C to stop")
+    print()
+    
+    try:
+        subprocess.run(['npm', 'run', 'dev'], cwd=frontend_dir)
+    except KeyboardInterrupt:
+        print("\n\n👋 Frontend server stopped")
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     run()

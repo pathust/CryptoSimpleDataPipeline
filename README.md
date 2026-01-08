@@ -27,10 +27,11 @@ A professional-grade cryptocurrency data pipeline and analytics platform with in
 - **Automatic Maintenance**: Weekly cleanup and optimization
 
 ### 🎨 Modern UI
-- **Dark Theme**: Professional, eye-friendly interface
-- **Multi-tab Dashboard**: Organized views for different features
+- **Dark Theme**: Professional, eye-friendly interface with Tailwind CSS
+- **Multi-tab Dashboard**: Organized views for different features (Dashboard, Charts, Indicators, Data Tables, Scheduler, Settings)
 - **Real-time Updates**: Auto-refresh every 15 seconds
 - **Responsive Design**: Works on desktop and tablet
+- **Data Tables**: View and export raw k-lines and orderbook data with pagination
 
 ## 🚦 Quick Start
 
@@ -101,35 +102,42 @@ python run_frontend.py
 ```
 CryptoSimpleDataPipeline/
 ├── frontend/                 # Web UI (Port 8000)
-│   ├── index.html           # Multi-tab dashboard
-│   ├── style.css            # Styling
-│   └── app.js               # Frontend logic
+│   ├── index.html           # Multi-tab dashboard (Tailwind CSS)
+│   ├── style.css            # Custom minimal styles
+│   └── app.js               # Frontend logic & API calls
 ├── src/
-│   ├── config.py            # Configuration
+│   ├── config.py            # Configuration (environment variables)
 │   ├── scheduler_config.py  # Runtime scheduler settings
 │   ├── modules/
 │   │   ├── extract/         # Data extraction (Binance API)
+│   │   │   └── manager.py   # ExtractionManager
 │   │   ├── transform/       # Data transformation & loading
+│   │   │   └── manager.py   # TransformManager
 │   │   ├── visualize/       # Data service & API
+│   │   │   └── service.py   # VisualizeService
 │   │   ├── stats/           # Technical indicators
+│   │   │   └── calculator.py # StatsCalculator
 │   │   ├── datalake/        # File management
+│   │   │   └── manager.py   # DataLakeManager
 │   │   └── warehouse/       # Data aggregation
+│   │       └── aggregator.py # WarehouseAggregator
 │   └── web/
 │       └── app.py           # Flask backend (Port 5001)
 ├── data_lake/
-│   ├── raw/                 # Active JSON files
-│   └── archive/             # Archived files
+│   ├── raw/                 # Active JSON files (by date)
+│   └── archive/             # Archived files (7+ days)
 ├── run_backend.py           # Backend launcher
 ├── run_frontend.py          # Frontend launcher
-└── rebuild_database.py      # Database reset utility
+├── rebuild_database.py      # Database reset utility
+└── requirements.txt         # Python dependencies
 ```
 
 ## 🔧 Configuration
 
 ### Tracked Symbols
-Edit in Settings tab or modify `src/config.py`:
-```python
-SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT"]
+Edit in Settings tab or modify `.env` file:
+```bash
+SYMBOLS=BTCUSDT,ETHUSDT,BNBUSDT
 ```
 
 ### Scheduler Interval
@@ -168,6 +176,10 @@ Modify in source files:
 - `POST /api/maintenance/trigger` - Manual maintenance
 - `GET /api/maintenance/stats` - Lake & warehouse stats
 
+### Data Tables
+- `GET /api/klines/table` - Paginated k-lines data (params: symbol, page, per_page)
+- `GET /api/orderbook/table` - Paginated orderbook data (params: symbol, page, per_page)
+
 ## 🗄️ Database Schema
 
 ### Fact Tables
@@ -181,14 +193,6 @@ Modify in source files:
 ### Metadata Tables
 - `extraction_metadata`: Incremental extraction tracking
 - `processed_files`: File processing history
-
-## 🛠️ Tech Stack
-
-- **Backend**: Flask, APScheduler, MySQL Connector
-- **Data Processing**: Pandas, NumPy
-- **Frontend**: Vanilla JavaScript, Lightweight Charts
-- **Database**: MySQL 8.0+
-- **Styling**: CSS Grid, Flexbox
 
 ## 🔐 Security Notes
 
@@ -204,6 +208,14 @@ See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for development setup and guideline
 ## 📝 License
 
 MIT License - See LICENSE file for details
+
+## 🚀 What's New
+
+- **✨ Data Tables**: View and export raw k-lines and orderbook data
+- **🎨 Tailwind UI**: Modern, responsive design with Tailwind CSS
+- **📊 Enhanced Charts**: Professional candlestick charts
+- **⚡ Smart Pipeline**: Incremental data extraction and auto-archiving
+- **🔧 Runtime Config**: Adjust scheduler without restart
 
 ## 🙏 Acknowledgments
 

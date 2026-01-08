@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>API Test</title>
+</head>
+<body>
+    <h1>CryptoFlow API Test</h1>
+    <button onclick="testAPI()">Test API Connection</button>
+    <pre id="result"></pre>
+    
+    <script>
+        async function testAPI() {
+            const result = document.getElementById('result');
+            result.textContent = 'Testing...';
+            
+            try {
+                // Test 1: Candlestick data
+                const response1 = await fetch('http://localhost:5001/api/analytics/candlestick/BTCUSDT?limit=5');
+                const data1 = await response1.json();
+                
+                // Test 2: Indicators
+                const response2 = await fetch('http://localhost:5001/api/indicators/BTCUSDT');
+                const data2 = await response2.json();
+                
+                result.textContent = `✅ SUCCESS!\n\nCandlestick data (${data1.length} candles):\n${JSON.stringify(data1[0], null, 2)}\n\nIndicators:\n${JSON.stringify(data2, null, 2)}`;
+            } catch (error) {
+                result.textContent = `❌ ERROR: ${error.message}\n\n${error.stack}`;
+            }
+        }
+    </script>
+</body>
+</html>

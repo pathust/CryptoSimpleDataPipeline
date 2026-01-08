@@ -1,13 +1,17 @@
 import subprocess
-import src.config as config
+import sys
+import os
 
 def run():
-    port = config.FLASK_PORT
+    # Run directly with current Python instead of conda run to avoid segfault
+    port = os.getenv("FLASK_PORT", "5001")
     print(f"Starting Backend on Port {port}...")
+    print("⚠️  Scheduler disabled (manual trigger via /api/trigger)")
     try:
-        subprocess.run(["conda", "run", "-n", "crypto_data_pipeline_env", "python", "src/web/app.py"])
+        # Use current Python interpreter
+        subprocess.run([sys.executable, "src/web/app.py"])
     except KeyboardInterrupt:
-        print("\nStopping Backend...")
+        print("\n\nStopping Backend...")
 
 if __name__ == "__main__":
     run()
