@@ -336,3 +336,76 @@ window.addEventListener('load', async () => {
     await loadDashboard();
     startAutoRefresh();
 });
+// Scheduler change detection
+async function loadScheduler() {
+    try {
+        const res = await fetch(`${API_BASE}/api/scheduler`);
+        const config = await res.json();
+
+        // Store original values
+        window.originalSchedulerConfig = {
+            interval: config.interval_seconds || 60,
+            enabled: config.enabled !== false
+        };
+
+        document.getElementById('interval-input').value = window.originalSchedulerConfig.interval;
+        document.getElementById('scheduler-toggle').checked = window.originalSchedulerConfig.enabled;
+
+        // Disable save button initially
+        const saveBtn = document.getElementById('save-scheduler-btn');
+        if (saveBtn) saveBtn.disabled = true;
+
+        loadPipelineStatus();
+    } catch (e) {
+        console.error('Failed to load scheduler config:', e);
+    }
+}
+
+function markSchedulerChanged() {
+    const currentInterval = parseInt(document.getElementById('interval-input').value);
+    const currentEnabled = document.getElementById('scheduler-toggle').checked;
+
+    const hasChanges =
+        currentInterval !== window.originalSchedulerConfig.interval ||
+        currentEnabled !== window.originalSchedulerConfig.enabled;
+
+    const saveBtn = document.getElementById('save-scheduler-btn');
+    if (saveBtn) saveBtn.disabled = !hasChanges;
+}
+
+async function updateScheduler() {
+    const btn = event.target;
+    const originalText = btn.textContent;
+    const interval = parseInt(document.getElementById('interval-input').value);
+    const enabled = document.getElementById('scheduler-toggle').checked;
+
+    if (interval < 10) {
+        showNotification('⚠️ Interval must be at least 10 seconds', 'warning');
+        return;
+    }
+
+    btn.textContent = '⏳ Saving...';
+    btn.disabled = true;
+
+    try {
+        const res = await fetch(`${API_BASE}/api/scheduler`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ interval_seconds: interval, enabled: enabled })
+        });
+
+        const data = await res.json();
+        if (data.status === 'success') {
+            // Update original config
+            window.originalSchedulerConfig = { interval, enabled };
+            showNotification(`✅ Scheduler updated! Interval: ${interval}s, Enabled: ${enabled}`, 'success');
+        }
+    } catch (e) {
+        showNotification('❌ Failed to update scheduler: ' + e.message, 'error');
+        btn.disabled = false;
+    } finally {
+        btn.textContent = originalText;
+        // Keep disabled until next change
+        btn.disabled = true;
+    }
+}
