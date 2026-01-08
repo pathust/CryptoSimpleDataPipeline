@@ -5,128 +5,178 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crypto Analytics Platform</title>
-    <link rel="stylesheet" href="style.css">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#6366f1',
+                        dark: {
+                            bg: '#0a0e27',
+                            card: '#1a1f3a',
+                            border: '#2d3352',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Lightweight Charts -->
     <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom Minimal Styles -->
+    <style>
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.4;
+            }
+        }
+
+        .pulse-dot {
+            animation: pulse 2s infinite;
+        }
+    </style>
 </head>
 
-<body>
-    <div class="app-container">
+<body class="dark bg-dark-bg text-gray-100">
+    <div class="flex h-screen">
         <!-- Sidebar -->
-        <nav class="sidebar">
-            <div class="logo">
-                <h2>📊 CryptoHub</h2>
+        <nav class="w-64 bg-gray-900 border-r border-dark-border">
+            <div class="p-4 border-b border-dark-border">
+                <h2 class="text-xl font-bold bg-gradient-to-r from-primary to-pink-500 bg-clip-text text-transparent">
+                    📊 CryptoHub
+                </h2>
             </div>
-            <ul class="nav-menu">
-                <li class="nav-item active" onclick="switchTab('dashboard')">
-                    <span class="icon">📈</span>
-                    <span>Dashboard</span>
-                </li>
-                <li class="nav-item" onclick="switchTab('charts')">
-                    <span class="icon">📉</span>
-                    <span>Charts</span>
-                </li>
-                <li class="nav-item" onclick="switchTab('indicators')">
-                    <span class="icon">🔬</span>
-                    <span>Indicators</span>
-                </li>
-                <li class="nav-item" onclick="switchTab('scheduler')">
-                    <span class="icon">⏰</span>
-                    <span>Scheduler</span>
-                </li>
-                <li class="nav-item" onclick="switchTab('settings')">
-                    <span class="icon">⚙️</span>
-                    <span>Settings</span>
-                </li>
+            <ul class="p-4 space-y-2">
+                <li><a href="#" onclick="switchTab('dashboard')"
+                        class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-primary/10 text-primary border-l-2 border-primary font-medium">
+                        📈 Dashboard
+                    </a></li>
+                <li><a href="#" onclick="switchTab('charts')"
+                        class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-primary/10 text-gray-400">
+                        📉 Charts
+                    </a></li>
+                <li><a href="#" onclick="switchTab('indicators')"
+                        class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-primary/10 text-gray-400">
+                        🔬 Indicators
+                    </a></li>
+                <li><a href="#" onclick="switchTab('scheduler')"
+                        class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-primary/10 text-gray-400">
+                        ⏰ Scheduler
+                    </a></li>
+                <li><a href="#" onclick="switchTab('settings')"
+                        class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-primary/10 text-gray-400">
+                        ⚙️ Settings
+                    </a></li>
             </ul>
         </nav>
 
         <!-- Main Content -->
-        <main class="main-content">
+        <main class="flex-1 overflow-y-auto p-8">
             <!-- Header -->
-            <header class="header">
-                <h1 id="page-title">Dashboard</h1>
-                <div class="header-actions">
-                    <div class="status-badge">
-                        <span class="pulse-dot"></span>
-                        <span id="status-text">Live</span>
-                    </div>
-                    <button class="btn-refresh" onclick="refreshData()">🔄 Refresh</button>
+            <header class="flex justify-between items-center mb-8 pb-4 border-b border-dark-border">
+                <h1 class="text-3xl font-bold" id="page-title">Dashboard</h1>
+                <div class="flex gap-4 items-center">
+                    <span
+                        class="flex items-center gap-2 px-4 py-2 bg-green-500/20 rounded-full border border-green-500/30">
+                        <span class="w-2 h-2 bg-green-500 rounded-full pulse-dot"></span>
+                        <span class="text-green-400">Live</span>
+                    </span>
+                    <button onclick="refreshData()"
+                        class="px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:border-primary transition">
+                        🔄 Refresh
+                    </button>
                 </div>
             </header>
 
             <!-- Dashboard Tab -->
-            <div id="dashboard-tab" class="tab-content active">
-                <div class="stats-grid" id="stats-grid">
-                    <!-- Stats cards will be injected here -->
-                </div>
-
-                <div class="quick-charts">
-                    <h3>Quick View</h3>
-                    <div class="quick-charts-grid" id="quick-charts-grid">
-                        <!-- Mini charts -->
-                    </div>
-                </div>
+            <div id="dashboard-tab" class="tab-content">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="stats-grid"></div>
             </div>
 
             <!-- Charts Tab -->
-            <div id="charts-tab" class="tab-content">
-                <div class="charts-container" id="charts-container">
-                    <!-- Full-size charts -->
-                </div>
+            <div id="charts-tab" class="tab-content hidden">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-4" id="charts-container"></div>
             </div>
 
             <!-- Indicators Tab -->
-            <div id="indicators-tab" class="tab-content">
-                <div class="indicators-grid" id="indicators-grid">
-                    <!-- Indicator cards -->
-                </div>
+            <div id="indicators-tab" class="tab-content hidden">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="indicators-grid"></div>
             </div>
 
             <!-- Scheduler Tab -->
-            <div id="scheduler-tab" class="tab-content">
-                <div class="scheduler-panel">
-                    <div class="card">
-                        <h3>⏰ Data Collection Schedule</h3>
-                        <div class="form-group">
-                            <label>Collection Interval (seconds)</label>
-                            <input type="number" id="interval-input" min="10" value="60"
-                                onchange="markSchedulerChanged()">
-                        </div>
-                        <div class="form-group">
-                            <div class="toggle-container">
-                                <label class="switch-wrapper">
-                                    <input type="checkbox" id="scheduler-toggle" checked
-                                        onchange="markSchedulerChanged()">
-                                    <span class="switch-slider"></span>
-                                </label>
-                                <span class="toggle-label">Enable Automatic Collection</span>
+            <div id="scheduler-tab" class="tab-content hidden">
+                <div class="max-w-2xl space-y-4">
+                    <div class="bg-dark-card border border-dark-border rounded-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">⏰ Data Collection Schedule</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-2">Collection Interval (seconds)</label>
+                                <input type="number" id="interval-input" min="10" value="60"
+                                    onchange="markSchedulerChanged()"
+                                    class="w-full px-4 py-2 bg-gray-900 border border-dark-border rounded-lg focus:border-primary focus:outline-none">
                             </div>
-                        </div>
-                        <div style="display: flex; gap: 12px;">
-                            <button class="btn-primary" id="save-scheduler-btn" onclick="updateScheduler()"
-                                disabled>Save Changes</button>
-                            <button class="btn-secondary" onclick="triggerNow()">Run Now</button>
+                            <div class="flex items-center gap-3">
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="scheduler-toggle" checked
+                                        onchange="markSchedulerChanged()" class="sr-only peer">
+                                    <div
+                                        class="w-11 h-6 bg-gray-700 rounded-full peer peer-checked:bg-primary peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-0.5 after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all">
+                                    </div>
+                                </label>
+                                <span class="text-sm">Enable Automatic Collection</span>
+                            </div>
+                            <div class="flex gap-3">
+                                <button id="save-scheduler-btn" onclick="updateScheduler()" disabled
+                                    class="px-6 py-2 bg-gradient-to-r from-primary to-purple-600 rounded-lg hover:shadow-lg hover:shadow-primary/50 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                                    💾 Save Changes
+                                </button>
+                                <button onclick="triggerNow()"
+                                    class="px-6 py-2 bg-green-600 rounded-lg hover:bg-green-700 transition">
+                                    ▶️ Run Now
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="card">
-                        <h3>Pipeline Status</h3>
+                    <div class="bg-dark-card border border-dark-border rounded-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">📊 Pipeline Status</h3>
                         <div id="pipeline-status"></div>
                     </div>
                 </div>
             </div>
 
             <!-- Settings Tab -->
-            <div id="settings-tab" class="tab-content">
-                <div class="settings-panel">
-                    <div class="card">
-                        <h3>Tracked Symbols</h3>
-                        <div class="form-group">
-                            <label>Symbols (comma separated)</label>
-                            <input type="text" id="symbols-input" placeholder="BTCUSDT, ETHUSDT">
+            <div id="settings-tab" class="tab-content hidden">
+                <div class="max-w-xl">
+                    <div class="bg-dark-card border border-dark-border rounded-lg p-6">
+                        <h3 class="text-lg font-semibold mb-4">💱 Tracked Symbols</h3>
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm text-gray-400 mb-2">Symbols (comma separated)</label>
+                                <input type="text" id="symbols-input" placeholder="BTCUSDT, ETHUSDT"
+                                    class="w-full px-4 py-2 bg-gray-900 border border-dark-border rounded-lg focus:border-primary focus:outline-none">
+                            </div>
+                            <button onclick="updateSymbols()"
+                                class="px-6 py-2 bg-gradient-to-r from-primary to-purple-600 rounded-lg hover:shadow-lg hover:shadow-primary/50 transition">
+                                💾 Update Symbols
+                            </button>
                         </div>
-                        <button class="btn-primary" onclick="updateSymbols()">Update Symbols</button>
                     </div>
                 </div>
             </div>

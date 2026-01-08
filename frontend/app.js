@@ -5,17 +5,19 @@ let updateInterval = null;
 
 // Tab Management
 function switchTab(tabName) {
-    // Update nav items
-    document.querySelectorAll('.nav-item').forEach(item => {
-        item.classList.remove('active');
+    // Update nav links
+    document.querySelectorAll('.nav-link').forEach(link => {
+        link.classList.remove('text-primary', 'border-l-2', 'border-primary', 'font-medium');
+        link.classList.add('text-gray-400');
     });
-    event.currentTarget.classList.add('active');
+    event.currentTarget.classList.remove('text-gray-400');
+    event.currentTarget.classList.add('text-primary', 'border-l-2', 'border-primary', 'font-medium');
 
     // Update tab content
     document.querySelectorAll('.tab-content').forEach(tab => {
-        tab.classList.remove('active');
+        tab.classList.add('hidden');
     });
-    document.getElementById(`${tabName}-tab`).classList.add('active');
+    document.getElementById(`${tabName}-tab`).classList.remove('hidden');
 
     // Update page title
     const titles = {
@@ -52,7 +54,7 @@ async function loadSymbols() {
 async function loadDashboard() {
     const symbols = await loadSymbols();
     const statsGrid = document.getElementById('stats-grid');
-    statsGrid.innerHTML = '<p>Loading statistics...</p>';
+    statsGrid.innerHTML = '<p class="text-gray-400">Loading statistics...</p>';
 
     let statsHTML = '';
     for (const symbol of symbols) {
@@ -62,20 +64,29 @@ async function loadDashboard() {
 
             if (stats.error) continue;
 
-            const changeClass = stats.change_24h >= 0 ? 'positive' : 'negative';
-            const changeSymbol = stats.change_24h >= 0 ? '▲' : '▼';
+            const changeColor = stats.change_24h >= 0 ? 'text-green-400' : 'text-red-400';
+            const changeIcon = stats.change_24h >= 0 ? '▲' : '▼';
 
             statsHTML += `
-                <div class="stat-card">
-                    <div class="stat-label">${symbol}</div>
-                    <div class="stat-value">$${stats.current_price.toLocaleString()}</div>
-                    <div class="stat-change ${changeClass}">
-                        ${changeSymbol} ${Math.abs(stats.change_24h)}%
-                    </div>
-                    <div style="margin-top: 12px; font-size: 12px; color: var(--text-secondary);">
-                        <div>High: $${stats.high_24h}</div>
-                        <div>Low: $${stats.low_24h}</div>
-                        <div>Volume: ${stats.volume_24h.toFixed(2)}</div>
+                <div class="bg-dark-card border border-dark-border rounded-lg p-6 hover:border-primary transition">
+                    <h6 class="text-gray-400 text-sm mb-2">${symbol}</h6>
+                    <h3 class="text-3xl font-bold mb-2">$${stats.current_price.toLocaleString()}</h3>
+                    <p class="${changeColor} font-medium mb-4">
+                        ${changeIcon} ${Math.abs(stats.change_24h)}%
+                    </p>
+                    <div class="space-y-1 text-sm">
+                        <div class="flex justify-between text-gray-400">
+                            <span>High:</span>
+                            <span class="text-gray-200">$${stats.high_24h}</span>
+                        </div>
+                        <div class="flex justify-between text-gray-400">
+                            <span>Low:</span>
+                            <span class="text-gray-200">$${stats.low_24h}</span>
+                        </div>
+                        <div class="flex justify-between text-gray-400">
+                            <span>Volume:</span>
+                            <span class="text-gray-200">${stats.volume_24h.toFixed(2)}</span>
+                        </div>
                     </div>
                 </div>
            `;
@@ -84,7 +95,7 @@ async function loadDashboard() {
         }
     }
 
-    statsGrid.innerHTML = statsHTML || '<p>No statistics available</p>';
+    statsGrid.innerHTML = statsHTML || '<p class="text-gray-400">No statistics available</p>';
 }
 
 // Charts Tab
