@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crypto Analytics Platform</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <nav class="sidebar">
+            <div class="logo">
+                <h2>📊 CryptoHub</h2>
+            </div>
+            <ul class="nav-menu">
+                <li class="nav-item active" onclick="switchTab('dashboard')">
+                    <span class="icon">📈</span>
+                    <span>Dashboard</span>
+                </li>
+                <li class="nav-item" onclick="switchTab('charts')">
+                    <span class="icon">📉</span>
+                    <span>Charts</span>
+                </li>
+                <li class="nav-item" onclick="switchTab('indicators')">
+                    <span class="icon">🔬</span>
+                    <span>Indicators</span>
+                </li>
+                <li class="nav-item" onclick="switchTab('scheduler')">
+                    <span class="icon">⏰</span>
+                    <span>Scheduler</span>
+                </li>
+                <li class="nav-item" onclick="switchTab('settings')">
+                    <span class="icon">⚙️</span>
+                    <span>Settings</span>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="header">
+                <h1 id="page-title">Dashboard</h1>
+                <div class="header-actions">
+                    <div class="status-badge">
+                        <span class="pulse-dot"></span>
+                        <span id="status-text">Live</span>
+                    </div>
+                    <button class="btn-refresh" onclick="refreshData()">🔄 Refresh</button>
+                </div>
+            </header>
+
+            <!-- Dashboard Tab -->
+            <div id="dashboard-tab" class="tab-content active">
+                <div class="stats-grid" id="stats-grid">
+                    <!-- Stats cards will be injected here -->
+                </div>
+
+                <div class="quick-charts">
+                    <h3>Quick View</h3>
+                    <div class="quick-charts-grid" id="quick-charts-grid">
+                        <!-- Mini charts -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Charts Tab -->
+            <div id="charts-tab" class="tab-content">
+                <div class="charts-container" id="charts-container">
+                    <!-- Full-size charts -->
+                </div>
+            </div>
+
+            <!-- Indicators Tab -->
+            <div id="indicators-tab" class="tab-content">
+                <div class="indicators-grid" id="indicators-grid">
+                    <!-- Indicator cards -->
+                </div>
+            </div>
+
+            <!-- Scheduler Tab -->
+            <div id="scheduler-tab" class="tab-content">
+                <div class="scheduler-panel">
+                    <div class="card">
+                        <h3>⏰ Data Collection Schedule</h3>
+                        <div class="form-group">
+                            <label>Collection Interval (seconds)</label>
+                            <input type="number" id="interval-input" min="10" value="60">
+                        </div>
+                        <div class="form-group">
+                            <label class="switch-label">
+                                <input type="checkbox" id="scheduler-toggle" checked>
+                                <span class="switch-slider"></span>
+                                <span>Enable Automatic Collection</span>
+                            </label>
+                        </div>
+                        <button class="btn-primary" onclick="updateScheduler()">Save Changes</button>
+                        <button class="btn-secondary" onclick="triggerNow()">Run Now</button>
+                    </div>
+
+                    <div class="card">
+                        <h3>Pipeline Status</h3>
+                        <div id="pipeline-status"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings-tab" class="tab-content">
+                <div class="settings-panel">
+                    <div class="card">
+                        <h3>Tracked Symbols</h3>
+                        <div class="form-group">
+                            <label>Symbols (comma separated)</label>
+                            <input type="text" id="symbols-input" placeholder="BTCUSDT, ETHUSDT">
+                        </div>
+                        <button class="btn-primary" onclick="updateSymbols()">Update Symbols</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
