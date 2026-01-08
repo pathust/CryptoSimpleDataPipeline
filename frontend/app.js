@@ -389,6 +389,6 @@ function startAutoRefresh() {
 }
 
 window.addEventListener('load', async () => {
-    await load Dashboard();
+    await loadDashboard();
     startAutoRefresh();
 });
