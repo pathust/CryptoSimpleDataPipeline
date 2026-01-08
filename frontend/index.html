@@ -75,6 +75,10 @@
                         class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-primary/10 text-gray-400">
                         🔬 Indicators
                     </a></li>
+                <li><a href="#" onclick="switchTab('tables')"
+                        class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-primary/10 text-gray-400">
+                        📋 Data Tables
+                    </a></li>
                 <li><a href="#" onclick="switchTab('scheduler')"
                         class="nav-link flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-primary/10 text-gray-400">
                         ⏰ Scheduler
@@ -117,6 +121,62 @@
             <!-- Indicators Tab -->
             <div id="indicators-tab" class="tab-content hidden">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4" id="indicators-grid"></div>
+            </div>
+
+            <!-- Data Tables Tab -->
+            <div id="tables-tab" class="tab-content hidden">
+                <div class="space-y-4">
+                    <!-- Controls -->
+                    <div class="flex gap-4 items-center">
+                        <select id="table-type" onchange="loadDataTable()"
+                            class="px-4 py-2 bg-gray-900 border border-dark-border rounded-lg focus:border-primary focus:outline-none">
+                            <option value="klines">K-Lines Data</option>
+                            <option value="orderbook">Order Book</option>
+                        </select>
+                        <select id="table-symbol" onchange="loadDataTable()"
+                            class="px-4 py-2 bg-gray-900 border border-dark-border rounded-lg focus:border-primary focus:outline-none">
+                            <!-- Symbols populated by JS -->
+                        </select>
+                        <button onclick="exportTableCSV()"
+                            class="px-4 py-2 bg-green-600 rounded-lg hover:bg-green-700 transition">
+                            📥 Export CSV
+                        </button>
+                    </div>
+
+                    <!-- Table -->
+                    <div class="bg-dark-card border border-dark-border rounded-lg overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-sm" id="data-table">
+                                <thead class="bg-gray-900 border-b border-dark-border">
+                                    <tr id="table-header">
+                                        <!-- Headers populated by JS -->
+                                    </tr>
+                                </thead>
+                                <tbody id="table-body">
+                                    <!-- Rows populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Pagination -->
+                    <div class="flex justify-between items-center">
+                        <div class="text-gray-400" id="table-info">Loading...</div>
+                        <div class="flex gap-2">
+                            <button onclick="prevPage()" id="prev-btn"
+                                class="px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:border-primary transition disabled:opacity-50">
+                                ← Previous
+                            </button>
+                            <span class="px-4 py-2 bg-dark-card border border-dark-border rounded-lg" id="page-info">
+                                Page 1
+                            </span>
+                            <button onclick="nextPage()" id="next-btn"
+                                class="px-4 py-2 bg-dark-card border border-dark-border rounded-lg hover:border-primary transition disabled:opacity-50">
+                                Next →
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Scheduler Tab -->

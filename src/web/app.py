@@ -1,6 +1,7 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from apscheduler.schedulers.background import BackgroundScheduler
+import mysql.connector
 import sys
 import os
 
@@ -149,6 +150,119 @@ def maintenance_stats():
         return jsonify({
             "data_lake": dl_stats,
             "warehouse": wh_stats
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/tables/klines')
+def get_klines_table():
+    """Get paginated k-lines data for table view."""
+    try:
+        symbol = request.args.get('symbol', config.SYMBOLS[0])
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 50))
+        offset = (page - 1) * limit
+        
+        conn = mysql.connector.connect(
+            host=config.DB_HOST,
+            user=config.DB_USER,
+            password=config.DB_PASSWORD,
+            database=config.DB_NAME
+        )
+        cursor = conn.cursor(dictionary=True)
+        
+        # Get total count
+        cursor.execute(
+            "SELECT COUNT(*) as total FROM fact_klines WHERE symbol = %s",
+            (symbol,)
+        )
+        total = cursor.fetchone()['total']
+        
+        # Get paginated data
+        cursor.execute("""
+            SELECT symbol, interval_code, open_time, open_price, high_price, 
+                   low_price, close_price, volume, close_time
+            FROM fact_klines 
+            WHERE symbol = %s 
+            ORDER BY open_time DESC 
+            LIMIT %s OFFSET %s
+        """, (symbol, limit, offset))
+        
+        data = cursor.fetchall()
+        
+        # Format dates
+        for row in data:
+            row['open_time'] = row['open_time'].strftime('%Y-%m-%d %H:%M:%S')
+            row['close_time'] = row['close_time'].strftime('%Y-%m-%d %H:%M:%S')
+            row['open_price'] = float(row['open_price'])
+            row['high_price'] = float(row['high_price'])
+            row['low_price'] = float(row['low_price'])
+            row['close_price'] = float(row['close_price'])
+            row['volume'] = float(row['volume'])
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "data": data,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": (total + limit - 1) // limit
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/tables/orderbook')
+def get_orderbook_table():
+    """Get paginated orderbook data for table view."""
+    try:
+        symbol = request.args.get('symbol', config.SYMBOLS[0])
+        page = int(request.args.get('page', 1))
+        limit = int(request.args.get('limit', 50))
+        offset = (page - 1) * limit
+        
+        conn = mysql.connector.connect(
+            host=config.DB_HOST,
+            user=config.DB_USER,
+            password=config.DB_PASSWORD,
+            database=config.DB_NAME
+        )
+        cursor = conn.cursor(dictionary=True)
+        
+        # Get total count
+        cursor.execute(
+            "SELECT COUNT(*) as total FROM fact_orderbook WHERE symbol = %s",
+            (symbol,)
+        )
+        total = cursor.fetchone()['total']
+        
+        # Get paginated data
+        cursor.execute("""
+            SELECT symbol, side, price, quantity, captured_at
+            FROM fact_orderbook 
+            WHERE symbol = %s 
+            ORDER BY captured_at DESC, price DESC
+            LIMIT %s OFFSET %s
+        """, (symbol, limit, offset))
+        
+        data = cursor.fetchall()
+        
+        # Format data
+        for row in data:
+            row['captured_at'] = row['captured_at'].strftime('%Y-%m-%d %H:%M:%S')
+            row['price'] = float(row['price'])
+            row['quantity'] = float(row['quantity'])
+        
+        cursor.close()
+        conn.close()
+        
+        return jsonify({
+            "data": data,
+            "total": total,
+            "page": page,
+            "limit": limit,
+            "total_pages": (total + limit - 1) // limit
         })
     except Exception as e:
         return jsonify({"error": str(e)}), 500
