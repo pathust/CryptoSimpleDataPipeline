@@ -90,17 +90,24 @@
                         <h3>⏰ Data Collection Schedule</h3>
                         <div class="form-group">
                             <label>Collection Interval (seconds)</label>
-                            <input type="number" id="interval-input" min="10" value="60">
+                            <input type="number" id="interval-input" min="10" value="60"
+                                onchange="markSchedulerChanged()">
                         </div>
                         <div class="form-group">
-                            <label class="switch-label">
-                                <input type="checkbox" id="scheduler-toggle" checked>
-                                <span class="switch-slider"></span>
-                                <span>Enable Automatic Collection</span>
-                            </label>
+                            <div class="toggle-container">
+                                <label class="switch-wrapper">
+                                    <input type="checkbox" id="scheduler-toggle" checked
+                                        onchange="markSchedulerChanged()">
+                                    <span class="switch-slider"></span>
+                                </label>
+                                <span class="toggle-label">Enable Automatic Collection</span>
+                            </div>
                         </div>
-                        <button class="btn-primary" onclick="updateScheduler()">Save Changes</button>
-                        <button class="btn-secondary" onclick="triggerNow()">Run Now</button>
+                        <div style="display: flex; gap: 12px;">
+                            <button class="btn-primary" id="save-scheduler-btn" onclick="updateScheduler()"
+                                disabled>Save Changes</button>
+                            <button class="btn-secondary" onclick="triggerNow()">Run Now</button>
+                        </div>
                     </div>
 
                     <div class="card">

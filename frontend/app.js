@@ -5,16 +5,19 @@ let updateInterval = null;
 
 // Tab Management
 function switchTab(tabName) {
+    // Update nav items
     document.querySelectorAll('.nav-item').forEach(item => {
         item.classList.remove('active');
     });
     event.currentTarget.classList.add('active');
 
+    // Update tab content
     document.querySelectorAll('.tab-content').forEach(tab => {
         tab.classList.remove('active');
     });
     document.getElementById(`${tabName}-tab`).classList.add('active');
 
+    // Update page title
     const titles = {
         'dashboard': 'Dashboard',
         'charts': 'Charts',
@@ -24,6 +27,7 @@ function switchTab(tabName) {
     };
     document.getElementById('page-title').textContent = titles[tabName];
 
+    // Load content for the tab
     if (tabName === 'dashboard') loadDashboard();
     if (tabName === 'charts') loadCharts();
     if (tabName === 'indicators') loadIndicators();
@@ -31,6 +35,7 @@ function switchTab(tabName) {
     if (tabName === 'settings') loadSettings();
 }
 
+// Load Symbols
 async function loadSymbols() {
     try {
         const res = await fetch(`${API_BASE}/api/config/symbols`);
@@ -43,6 +48,7 @@ async function loadSymbols() {
     }
 }
 
+// Dashboard Tab
 async function loadDashboard() {
     const symbols = await loadSymbols();
     const statsGrid = document.getElementById('stats-grid');
@@ -72,7 +78,7 @@ async function loadDashboard() {
                         <div>Volume: ${stats.volume_24h.toFixed(2)}</div>
                     </div>
                 </div>
-            `;
+           `;
         } catch (e) {
             console.error(`Failed to load stats for ${symbol}:`, e);
         }
@@ -81,6 +87,7 @@ async function loadDashboard() {
     statsGrid.innerHTML = statsHTML || '<p>No statistics available</p>';
 }
 
+// Charts Tab
 async function loadCharts() {
     const symbols = await loadSymbols();
     const container = document.getElementById('charts-container');
@@ -131,6 +138,7 @@ async function createChart(containerId, symbol) {
 
     charts[symbol] = { chart, series: candlestickSeries };
 
+    // Load data
     try {
         const res = await fetch(`${API_BASE}/api/data/${symbol}`);
         const data = await res.json();
@@ -141,11 +149,13 @@ async function createChart(containerId, symbol) {
         console.error(`Failed to load chart data for ${symbol}:`, e);
     }
 
+    // Handle resize
     new ResizeObserver(() => {
         chart.applyOptions({ width: container.clientWidth });
     }).observe(container);
 }
 
+// Indicators Tab
 async function loadIndicators() {
     const symbols = await loadSymbols();
     const grid = document.getElementById('indicators-grid');
@@ -194,6 +204,7 @@ async function loadIndicators() {
     grid.innerHTML = html || '<p>No indicators available</p>';
 }
 
+// Scheduler Tab
 async function loadScheduler() {
     try {
         const res = await fetch(`${API_BASE}/api/scheduler`);
@@ -202,6 +213,7 @@ async function loadScheduler() {
         document.getElementById('interval-input').value = config.interval_seconds || 60;
         document.getElementById('scheduler-toggle').checked = config.enabled !== false;
 
+        // Load pipeline status
         loadPipelineStatus();
     } catch (e) {
         console.error('Failed to load scheduler config:', e);
@@ -239,80 +251,47 @@ async function loadPipelineStatus() {
 }
 
 async function updateScheduler() {
-    const btn = event.target;
-    const originalText = btn.textContent;
     const interval = parseInt(document.getElementById('interval-input').value);
     const enabled = document.getElementById('scheduler-toggle').checked;
-
-    if (interval < 10) {
-        showNotification('⚠️ Interval must be at least 10 seconds', 'warning');
-        return;
-    }
-
-    btn.textContent = '⏳ Saving...';
-    btn.disabled = true;
 
     try {
         const res = await fetch(`${API_BASE}/api/scheduler`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ interval_seconds: interval, enabled: enabled })
+            body: JSON.stringify({
+                interval_seconds: interval,
+                enabled: enabled
+            })
         });
 
         const data = await res.json();
         if (data.status === 'success') {
-            showNotification(`✅ Scheduler updated! Interval: ${interval}s, Enabled: ${enabled}`, 'success');
+            alert(`✅ Scheduler updated!\nInterval: ${interval}s\nEnabled: ${enabled}`);
         }
     } catch (e) {
-        showNotification('❌ Failed to update scheduler: ' + e.message, 'error');
-    } finally {
-        btn.textContent = originalText;
-        btn.disabled = false;
+        alert('❌ Failed to update scheduler: ' + e.message);
     }
 }
 
 async function triggerNow() {
-    const btn = event.target;
-    const originalText = btn.textContent;
-
-    btn.textContent = '⏳ Running Pipeline...';
-    btn.disabled = true;
-
     try {
         await fetch(`${API_BASE}/api/trigger`, { method: 'POST' });
-        showNotification('✅ Pipeline triggered! Refreshing status...', 'success');
-        setTimeout(() => {
-            loadPipelineStatus();
-            showNotification('✅ Pipeline completed!', 'success');
-        }, 2000);
+        alert('✅ Pipeline triggered! Check the status in a moment.');
+        setTimeout(loadPipelineStatus, 2000);
     } catch (e) {
-        showNotification('❌ Failed to trigger pipeline: ' + e.message, 'error');
-    } finally {
-        setTimeout(() => {
-            btn.textContent = originalText;
-            btn.disabled = false;
-        }, 2500);
+        alert('❌ Failed to trigger pipeline: ' + e.message);
     }
 }
 
+// Settings Tab
 async function loadSettings() {
     const symbols = await loadSymbols();
     document.getElementById('symbols-input').value = symbols.join(', ');
 }
 
 async function updateSymbols() {
-    const btn = event.target;
-    const originalText = btn.textContent;
     const input = document.getElementById('symbols-input').value;
     const symbols = input.split(',').map(s => s.trim()).filter(s => s);
-
-    if (symbols.length === 0) {
-        showNotification('⚠️ Please enter at least one symbol', 'warning');
-        return;
-    }
-
-    btn.textContent = '⏳ Updating...';
-    btn.disabled = true;
 
     try {
         const res = await fetch(`${API_BASE}/api/config/symbols`, {
@@ -324,70 +303,35 @@ async function updateSymbols() {
         const data = await res.json();
         if (data.status === 'success') {
             currentSymbols = symbols;
-            showNotification('✅ Symbols updated: ' + symbols.join(', '), 'success');
-            setTimeout(refreshData, 500);
+            alert('✅ Symbols updated: ' + symbols.join(', '));
         }
     } catch (e) {
-        showNotification('❌ Failed to update symbols: ' + e.message, 'error');
-    } finally {
-        btn.textContent = originalText;
-        btn.disabled = false;
+        alert('❌ Failed to update symbols: ' + e.message);
     }
 }
 
-function showNotification(message, type = 'info') {
-    const existing = document.querySelector('.notification');
-    if (existing) existing.remove();
-
-    const notification = document.createElement('div');
-    notification.className = `notification notification-${type}`;
-    notification.textContent = message;
-
-    document.body.appendChild(notification);
-    setTimeout(() => notification.classList.add('show'), 10);
-
-    setTimeout(() => {
-        notification.classList.remove('show');
-        setTimeout(() => notification.remove(), 300);
-    }, 3000);
-}
-
+// Refresh Data
 async function refreshData() {
-    const btn = document.querySelector('.btn-refresh');
-    const originalText = btn?.textContent;
-
-    if (btn) {
-        btn.textContent = '⏳ Refreshing...';
-        btn.disabled = true;
-    }
-
     const activeTab = document.querySelector('.tab-content.active').id;
 
-    try {
-        if (activeTab === 'dashboard-tab') await loadDashboard();
-        if (activeTab === 'charts-tab') await loadCharts();
-        if (activeTab === 'indicators-tab') await loadIndicators();
-        if (activeTab === 'scheduler-tab') await loadScheduler();
-
-        showNotification('✅ Data refreshed', 'success');
-    } catch (e) {
-        showNotification('❌ Refresh failed: ' + e.message, 'error');
-    } finally {
-        if (btn) {
-            btn.textContent = originalText;
-            btn.disabled = false;
-        }
-    }
+    if (activeTab === 'dashboard-tab') await loadDashboard();
+    if (activeTab === 'charts-tab') await loadCharts();
+    if (activeTab === 'indicators-tab') await loadIndicators();
+    if (activeTab === 'scheduler-tab') await loadScheduler();
 }
 
+// Auto Refresh
 function startAutoRefresh() {
     if (updateInterval) clearInterval(updateInterval);
     updateInterval = setInterval(() => {
         const activeTab = document.querySelector('.tab-content.active').id;
-        if (activeTab === 'dashboard-tab') loadDashboard();
-    }, 15000);
+        if (activeTab === 'dashboard-tab') {
+            loadDashboard();
+        }
+    }, 15000); // Refresh every 15 seconds
 }
 
+// Initialize
 window.addEventListener('load', async () => {
     await loadDashboard();
     startAutoRefresh();
