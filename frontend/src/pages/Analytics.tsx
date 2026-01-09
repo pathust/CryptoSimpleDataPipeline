@@ -1,17 +1,26 @@
 import { useState } from "react";
+import { useParams, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { LineChart } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { CandlestickChart } from "@/components/analytics/CandlestickChart";
+import { ProfessionalCandlestickChart } from "@/components/charts/ProfessionalCandlestickChart";
 import { Statistics24h } from "@/components/analytics/Statistics24h";
 import { Orderbook } from "@/components/analytics/Orderbook";
 
+const VALID_SYMBOLS = ['BTC_USDT', 'ETH_USDT', 'BNB_USDT'];
+
 export default function Analytics() {
+  const { symbol } = useParams<{ symbol: string }>();
   const [showRSI, setShowRSI] = useState(false);
   const [showMACD, setShowMACD] = useState(false);
   const [showBollinger, setShowBollinger] = useState(false);
+
+  // Validate symbol and redirect if invalid
+  if (!symbol || !VALID_SYMBOLS.includes(symbol)) {
+    return <Navigate to="/analytics/BTC_USDT" replace />;
+  }
 
   return (
     <div className="space-y-6">
@@ -68,8 +77,10 @@ export default function Analytics() {
             </div>
           </Card>
 
-          {/* Chart */}
-          <CandlestickChart
+          {/* Chart - key prop forces fresh mount on symbol change */}
+          <ProfessionalCandlestickChart
+            key={symbol}
+            symbol={symbol}
             showRSI={showRSI}
             showMACD={showMACD}
             showBollinger={showBollinger}
@@ -78,8 +89,8 @@ export default function Analytics() {
 
         {/* Side Panel */}
         <div className="space-y-4">
-          <Statistics24h />
-          <Orderbook />
+          <Statistics24h symbol={symbol} />
+          <Orderbook symbol={symbol} />
         </div>
       </div>
     </div>

@@ -36,12 +36,36 @@ const statusConfig = {
   idle: { icon: CheckCircle, color: "text-muted-foreground", bg: "bg-muted/30", label: "Idle" },
   disabled: { icon: XCircle, color: "text-muted-foreground", bg: "bg-muted/30", label: "Disabled" },
   error: { icon: XCircle, color: "text-destructive", bg: "bg-destructive/10", label: "Error" },
+  overdue: { icon: Clock, color: "text-yellow-500", bg: "bg-yellow-500/10", label: "Overdue" },
 };
 
 export function JobCard({ job, onToggle, onIntervalChange, onRunNow }: JobCardProps) {
   const [isRunning, setIsRunning] = useState(false);
   const config = statusConfig[job.status as keyof typeof statusConfig];
   const StatusIcon = config.icon;
+
+  // Normalize interval from backend format (e.g., "300s" -> "5m")
+  const normalizeInterval = (interval: string): string => {
+    const match = interval.match(/^(\d+)([smhd])$/);
+    if (!match) return interval;
+    const [, value, unit] = match;
+    const num = parseInt(value);
+
+    if (unit === 's') {
+      if (num === 60) return '1m';
+      if (num === 300) return '5m';
+      if (num === 3600) return '1h';
+      if (num === 86400) return '1d';
+    } else if (unit === 'm') {
+      if (num === 60) return '1h';
+      if (num === 1440) return '1d';
+    } else if (unit === 'h') {
+      if (num === 24) return '1d';
+    }
+    return interval;
+  };
+
+  const displayInterval = normalizeInterval(job.interval);
 
   const handleRunNow = () => {
     setIsRunning(true);
@@ -77,12 +101,25 @@ export function JobCard({ job, onToggle, onIntervalChange, onRunNow }: JobCardPr
               <div className="flex items-center gap-2">
                 <Clock className="h-3 w-3 text-muted-foreground" />
                 <span className="text-xs text-muted-foreground">
-                  Last: {new Date(job.lastRun).toLocaleString()}
+                  Last: {job.lastRun ? new Date(job.lastRun).toLocaleString() : 'Never'}
                 </span>
               </div>
-              {job.nextRun && (
+              {job.nextRun && job.nextRun !== 'null' && (
                 <Badge variant="outline" className="text-xs">
-                  Next: {new Date(job.nextRun).toLocaleTimeString()}
+                  Next: {(() => {
+                    // Check if it's a descriptive text (contains day names or AM/PM without 'T')
+                    const isTextFormat = /(?:Sunday|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday)|(?:AM|PM)(?!.*T)/.test(job.nextRun);
+                    if (isTextFormat) {
+                      return job.nextRun;
+                    }
+                    // Try parse as ISO datetime and show full date + time
+                    try {
+                      const date = new Date(job.nextRun);
+                      return isNaN(date.getTime()) ? job.nextRun : date.toLocaleString();
+                    } catch {
+                      return job.nextRun;
+                    }
+                  })()}
                 </Badge>
               )}
             </div>
@@ -96,7 +133,7 @@ export function JobCard({ job, onToggle, onIntervalChange, onRunNow }: JobCardPr
 
             <div className="flex items-center gap-2">
               <Select
-                value={job.interval}
+                value={displayInterval}
                 onValueChange={(value) => onIntervalChange(job.id, value)}
                 disabled={!job.enabled}
               >

@@ -23,27 +23,33 @@ class WarehouseAggregator:
             symbol_filter = f"AND symbol = '{symbol}'" if symbol else ""
             
             # Aggregate into hourly_klines
+            # Use window functions compatible approach for first/last values
             query = f"""
             INSERT INTO hourly_klines 
             (symbol, hour_start, open_price, high_price, low_price, close_price, volume, trade_count)
             SELECT 
                 symbol,
-                DATE_FORMAT(open_time, '%Y-%m-%d %H:00:00') as hour_start,
-                (SELECT open_price FROM fact_klines f2 
-                 WHERE f2.symbol = f1.symbol 
-                 AND DATE_FORMAT(f2.open_time, '%Y-%m-%d %H:00:00') = DATE_FORMAT(f1.open_time, '%Y-%m-%d %H:00:00')
-                 ORDER BY open_time ASC LIMIT 1) as open_price,
+                hour_start,
+                SUBSTRING_INDEX(GROUP_CONCAT(open_price ORDER BY open_time ASC), ',', 1) as open_price,
                 MAX(high_price) as high_price,
                 MIN(low_price) as low_price,
-                (SELECT close_price FROM fact_klines f3 
-                 WHERE f3.symbol = f1.symbol 
-                 AND DATE_FORMAT(f3.open_time, '%Y-%m-%d %H:00:00') = DATE_FORMAT(f1.open_time, '%Y-%m-%d %H:00:00')
-                 ORDER BY open_time DESC LIMIT 1) as close_price,
+                SUBSTRING_INDEX(GROUP_CONCAT(close_price ORDER BY open_time DESC), ',', 1) as close_price,
                 SUM(volume) as volume,
                 COUNT(*) as trade_count
-            FROM fact_klines f1
-            WHERE 1=1 {symbol_filter}
-            GROUP BY symbol, DATE_FORMAT(open_time, '%Y-%m-%d %H:00:00')
+            FROM (
+                SELECT 
+                    symbol,
+                    DATE_FORMAT(open_time, '%Y-%m-%d %H:00:00') as hour_start,
+                    open_time,
+                    open_price,
+                    high_price,
+                    low_price,
+                    close_price,
+                    volume
+                FROM fact_klines
+                WHERE 1=1 {symbol_filter}
+            ) AS subquery
+            GROUP BY symbol, hour_start
             ON DUPLICATE KEY UPDATE
                 open_price = VALUES(open_price),
                 high_price = VALUES(high_price),
@@ -80,22 +86,28 @@ class WarehouseAggregator:
             (symbol, date, open_price, high_price, low_price, close_price, volume, trade_count)
             SELECT 
                 symbol,
-                DATE(hour_start) as date,
-                (SELECT open_price FROM hourly_klines h2 
-                 WHERE h2.symbol = h1.symbol 
-                 AND DATE(h2.hour_start) = DATE(h1.hour_start)
-                 ORDER BY hour_start ASC LIMIT 1) as open_price,
+                date,
+                SUBSTRING_INDEX(GROUP_CONCAT(open_price ORDER BY hour_start ASC), ',', 1) as open_price,
                 MAX(high_price) as high_price,
                 MIN(low_price) as low_price,
-                (SELECT close_price FROM hourly_klines h3 
-                 WHERE h3.symbol = h1.symbol 
-                 AND DATE(h3.hour_start) = DATE(h1.hour_start)
-                 ORDER BY hour_start DESC LIMIT 1) as close_price,
+                SUBSTRING_INDEX(GROUP_CONCAT(close_price ORDER BY hour_start DESC), ',', 1) as close_price,
                 SUM(volume) as volume,
                 SUM(trade_count) as trade_count
-            FROM hourly_klines h1
-            WHERE 1=1 {symbol_filter}
-            GROUP BY symbol, DATE(hour_start)
+            FROM (
+                SELECT 
+                    symbol,
+                    DATE(hour_start) as date,
+                    hour_start,
+                    open_price,
+                    high_price,
+                    low_price,
+                    close_price,
+                    volume,
+                    trade_count
+                FROM hourly_klines
+                WHERE 1=1 {symbol_filter}
+            ) AS subquery
+            GROUP BY symbol, date
             ON DUPLICATE KEY UPDATE
                 open_price = VALUES(open_price),
                 high_price = VALUES(high_price),

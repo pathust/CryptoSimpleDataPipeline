@@ -65,8 +65,10 @@ class AnalyticsService:
             # Convert to list of dictionaries
             candlesticks = []
             for _, row in df.iterrows():
+                # Use replace(tzinfo=UTC) then isoformat() to get proper UTC indicator
+                open_time_utc = row['open_time'].replace(tzinfo=None).isoformat() + 'Z' if pd.notna(row['open_time']) else None
                 candlesticks.append({
-                    'time': row['open_time'].isoformat() if pd.notna(row['open_time']) else None,
+                    'time': open_time_utc,
                     'open': float(row['open_price']) if pd.notna(row['open_price']) else 0,
                     'high': float(row['high_price']) if pd.notna(row['high_price']) else 0,
                     'low': float(row['low_price']) if pd.notna(row['low_price']) else 0,

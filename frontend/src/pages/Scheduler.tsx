@@ -11,6 +11,29 @@ export default function Scheduler() {
 
   useEffect(() => {
     loadJobs();
+
+    // Poll jobs every 5 seconds to check for overdue jobs
+    const interval = setInterval(async () => {
+      try {
+        const data = await getSchedulerJobs();
+        setJobs(data);
+
+        // Auto-run overdue jobs
+        for (const job of data) {
+          if (job.shouldAutoRun && job.enabled) {
+            console.log(`Auto-running overdue job: ${job.id}`);
+            await runSchedulerJob(job.id);
+            // Reload to get updated lastRun and nextRun
+            await loadJobs();
+            break; // Only run one at a time
+          }
+        }
+      } catch (error) {
+        console.error("Failed to poll jobs:", error);
+      }
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, []);
 
   const loadJobs = async () => {
@@ -46,6 +69,8 @@ export default function Scheduler() {
         prev.map((job: any) => (job.id === id ? { ...job, interval } : job))
       );
       toast.success(`Interval updated to ${interval}`);
+      // Reload jobs to get persisted value from backend
+      await loadJobs();
     } catch (error) {
       toast.error("Failed to update interval");
     }
@@ -58,7 +83,7 @@ export default function Scheduler() {
           job.id === id ? { ...job, status: "running", lastRun: new Date().toISOString() } : job
         )
       );
-      
+
       await runSchedulerJob(id);
       toast.success("Job triggered successfully!");
 

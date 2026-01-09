@@ -16,7 +16,14 @@ from src.scheduler_config import SchedulerConfig
 import src.config as config
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, 
+     resources={r"/api/*": {
+         "origins": "*", 
+         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"], 
+         "allow_headers": "*",
+         "expose_headers": "*",
+         "supports_credentials": False
+     }})
 
 # TEMPORARY: Disable APScheduler due to segfault in conda env
 # Scheduler can be triggered manually via /api/trigger endpoint
@@ -324,10 +331,19 @@ def update_scheduler_job(job_id):
     updates = request.json
     success = scheduler_config.update_job(job_id, updates)
     
-    if success and job_id == "pipeline_job" and "interval" in updates:
-        # Reschedule if interval changed
+    if success and job_id == "pipeline_job" and "interval" in updates and scheduler is not None:
+        # Reschedule if interval changed (only if scheduler is enabled)
         interval_str = updates["interval"]
-        new_interval = int(interval_str.rstrip('s'))
+        # Parse interval string to seconds (supports: 30s, 5m, 1h)
+        if interval_str.endswith('s'):
+            new_interval = int(interval_str[:-1])
+        elif interval_str.endswith('m'):
+            new_interval = int(interval_str[:-1]) * 60
+        elif interval_str.endswith('h'):
+            new_interval = int(interval_str[:-1]) * 3600
+        else:
+            new_interval = int(interval_str)
+            
         scheduler.reschedule_job(
             'pipeline_job',
             trigger='interval',

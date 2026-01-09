@@ -65,6 +65,49 @@ class SchedulerConfig:
     
     def get_all_jobs(self):
         """Get all scheduled jobs with their status."""
+        from datetime import datetime, timedelta
+        
+        now = datetime.now()
+        
+        # Calculate next run time for pipeline job
+        pipeline_next_run = None
+        pipeline_should_run = False
+        last_run_str = self.config.get("last_pipeline_run")
+        if last_run_str:
+            try:
+                last_run = datetime.fromisoformat(last_run_str)
+                interval_seconds = self.get_interval()
+                next_run = last_run + timedelta(seconds=interval_seconds)
+                
+                # Check if overdue
+                if next_run < now:
+                    pipeline_should_run = True
+                    # Show that it's overdue
+                    pipeline_next_run = now.isoformat()
+                else:
+                    pipeline_next_run = next_run.isoformat()
+            except:
+                pipeline_next_run = None
+        
+        # Calculate next run for maintenance job
+        maintenance_interval = self.config.get("maintenance_interval_seconds", 86400)  # Default 1 day
+        maintenance_next_run = None
+        maintenance_should_run = False
+        last_maintenance_str = self.config.get("last_maintenance_run")
+        if last_maintenance_str:
+            try:
+                last_run = datetime.fromisoformat(last_maintenance_str)
+                next_run = last_run + timedelta(seconds=maintenance_interval)
+                
+                # Check if overdue
+                if next_run < now:
+                    maintenance_should_run = True
+                    maintenance_next_run = now.isoformat()
+                else:
+                    maintenance_next_run = next_run.isoformat()
+            except:
+                maintenance_next_run = None
+        
         jobs = [
             {
                 "id": "pipeline_job",
@@ -72,19 +115,21 @@ class SchedulerConfig:
                 "description": "Extract and transform crypto data from Binance API",
                 "interval": f"{self.get_interval()}s",
                 "enabled": self.is_enabled(),
-                "status": "idle",
+                "status": "overdue" if pipeline_should_run else "idle",
                 "lastRun": self.config.get("last_pipeline_run"),
-                "nextRun": None  # Can be calculated based on interval
+                "nextRun": pipeline_next_run,
+                "shouldAutoRun": pipeline_should_run
             },
             {
                 "id": "maintenance_job",
-                "name": "Weekly Maintenance",
+                "name": "Periodic Maintenance",
                 "description": "Archive old files, cleanup data",
-                "interval": "weekly",
+                "interval": f"{maintenance_interval}s",
                 "enabled": True,
-                "status": "idle",
+                "status": "overdue" if maintenance_should_run else "idle",
                 "lastRun": self.config.get("last_maintenance_run"),
-                "nextRun": "Sunday 2:00 AM"
+                "nextRun": maintenance_next_run,
+                "shouldAutoRun": maintenance_should_run
             }
         ]
         return jobs
@@ -93,12 +138,40 @@ class SchedulerConfig:
         """Update specific job configuration."""
         if job_id == "pipeline_job":
             if "interval" in updates:
-                # Convert interval string (e.g., "60s") to seconds
+                # Convert interval string to seconds
+                # Supports: "30s" (seconds), "5m" (minutes), "1h" (hours)
                 interval_str = updates["interval"]
-                seconds = int(interval_str.rstrip('s'))
+                if interval_str.endswith('s'):
+                    seconds = int(interval_str[:-1])
+                elif interval_str.endswith('m'):
+                    seconds = int(interval_str[:-1]) * 60
+                elif interval_str.endswith('h'):
+                    seconds = int(interval_str[:-1]) * 3600
+                elif interval_str.endswith('d'):
+                    seconds = int(interval_str[:-1]) * 86400
+                else:
+                    # Default: treat as seconds if no unit
+                    seconds = int(interval_str)
                 self.set_interval(seconds)
             if "enabled" in updates:
                 self.set_enabled(updates["enabled"])
+            return True
+        elif job_id == "maintenance_job":
+            if "interval" in updates:
+                # Parse maintenance interval
+                interval_str = updates["interval"]
+                if interval_str.endswith('s'):
+                    seconds = int(interval_str[:-1])
+                elif interval_str.endswith('m'):
+                    seconds = int(interval_str[:-1]) * 60
+                elif interval_str.endswith('h'):
+                    seconds = int(interval_str[:-1]) * 3600
+                elif interval_str.endswith('d'):
+                    seconds = int(interval_str[:-1]) * 86400
+                else:
+                    seconds = int(interval_str)
+                self.config["maintenance_interval_seconds"] = seconds
+                self.save_config()
             return True
         return False
     

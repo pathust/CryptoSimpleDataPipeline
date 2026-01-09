@@ -3,14 +3,20 @@ import { Card } from "@/components/ui/card";
 import { TrendingUp, TrendingDown } from "lucide-react";
 import { getStatistics } from "@/lib/api-client";
 
-export function Statistics24h() {
+interface Statistics24hProps {
+  symbol: string;
+}
+
+export function Statistics24h({ symbol }: Statistics24hProps) {
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadStats = async () => {
       try {
-        const data = await getStatistics("BTCUSDT");
+        // Convert URL format (BTC_USDT) to API format (BTCUSDT)
+        const apiSymbol = symbol.replace('_', '');
+        const data = await getStatistics(apiSymbol);
         setStats(data);
       } catch (error) {
         console.error("Failed to load 24h statistics:", error);
@@ -19,7 +25,7 @@ export function Statistics24h() {
       }
     };
     loadStats();
-  }, []);
+  }, [symbol]); // Reload when symbol changes
 
   if (loading) {
     return (
@@ -54,7 +60,7 @@ export function Statistics24h() {
             ${stats.current_price?.toLocaleString() || "N/A"}
           </span>
         </div>
-        
+
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">24h Change</span>
           <div className={`flex items-center gap-1 text-sm font-medium ${isPositive ? "text-green-500" : "text-red-500"}`}>
@@ -62,21 +68,21 @@ export function Statistics24h() {
             <span>{stats.change_24h || "N/A"}</span>
           </div>
         </div>
-        
+
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">24h High</span>
           <span className="text-sm font-medium text-foreground">
             ${stats.high_24h?.toLocaleString() || "N/A"}
           </span>
         </div>
-        
+
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">24h Low</span>
           <span className="text-sm font-medium text-foreground">
             ${stats.low_24h?.toLocaleString() || "N/A"}
           </span>
         </div>
-        
+
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground">24h Volume</span>
           <span className="text-sm font-medium text-foreground">

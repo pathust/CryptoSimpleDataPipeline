@@ -20,11 +20,10 @@ class TransformManager:
             database=config.DB_NAME
         )
 
-    def process_file(self, filepath):
-        # Check if already processed
-        if self.datalake_mgr.is_file_processed(filepath):
-            print(f"⏭️  Skipping {os.path.basename(filepath)} (already processed)")
-            return 0
+    def process_file(self, filepath, force_process=False):
+        # Check if already processed (unless forced)
+        if not force_process and self.datalake_mgr.is_file_processed(filepath):
+            return 0  # Silently skip without logging
         
         try:
             conn = self.get_db_connection()
@@ -127,9 +126,20 @@ class TransformManager:
         files = glob.glob(search_path)
         
         total_records = 0
+        processed_count = 0
+        skipped_count = 0
+        
         for f in files:
             count = self.process_file(f)
-            total_records += count
+            if count > 0:
+                processed_count += 1
+                total_records += count
+            else:
+                skipped_count += 1
+        
+        # Print summary
+        if processed_count > 0 or skipped_count > 0:
+            print(f"📦 Processed {processed_count} new files, skipped {skipped_count} duplicates")
         
         # After processing, trigger aggregations
         if total_records > 0:
@@ -142,6 +152,9 @@ class TransformManager:
     def run_maintenance(self):
         """Run data lake and warehouse maintenance tasks."""
         print("\n🧹 Running maintenance tasks...")
+        
+        # NEW: Detect and fill data gaps
+        self._detect_and_fill_gaps()
         
         # Archive old files (7+ days)
         self.datalake_mgr.archive_old_files(days_old=7)
@@ -158,3 +171,198 @@ class TransformManager:
         
         print(f"\n📊 Data Lake: {dl_stats.get('active_files', 0)} active files, {dl_stats.get('archived_files', 0)} archived")
         print(f"📊 Warehouse: {wh_stats.get('klines_count', 0)} klines, {wh_stats.get('hourly_count', 0)} hourly, {wh_stats.get('daily_count', 0)} daily")
+    
+    def _detect_and_fill_gaps(self):
+        """Detect and fill gaps in klines data."""
+        from src.modules.extract.manager import ExtractionManager
+        from datetime import timedelta
+        
+        print("\n🔍 Detecting data gaps and integrity issues...")
+        extractor = ExtractionManager()
+        
+        for symbol in config.SYMBOLS:
+            try:
+                conn = self.get_db_connection()
+                cursor = conn.cursor()
+                
+                # STEP 0: Check data integrity - open[i] should equal close[i-1]
+                cursor.execute("""
+                    SELECT 
+                        t1.open_time,
+                        t1.close_price as prev_close,
+                        t2.open_time,
+                        t2.open_price as curr_open
+                    FROM fact_klines t1
+                    INNER JOIN fact_klines t2 
+                        ON t1.symbol = t2.symbol
+                        AND t2.open_time = DATE_ADD(t1.open_time, INTERVAL 1 MINUTE)
+                    WHERE t1.symbol = %s 
+                        AND t1.interval_code = '1m'
+                        AND ABS(t1.close_price - t2.open_price) > 0.01
+                    ORDER BY t1.open_time
+                    LIMIT 10
+                """, (symbol,))
+                
+                integrity_issues = cursor.fetchall()
+                
+                if integrity_issues:
+                    print(f"\n⚠️  {symbol}: Found {len(integrity_issues)} price continuity issue(s)")
+                    for prev_time, prev_close, curr_time, curr_open in integrity_issues:
+                        print(f"   🔧 Fixing: {prev_time} close={prev_close:.2f} → {curr_time} open={curr_open:.2f}")
+                        
+                        # Delete both candles to refetch clean data
+                        cursor.execute("""
+                            DELETE FROM fact_klines 
+                            WHERE symbol = %s 
+                                AND interval_code = '1m'
+                                AND open_time IN (%s, %s)
+                        """, (symbol, prev_time, curr_time))
+                        conn.commit()
+                        
+                        # Fetch clean data for this range
+                        start_time = prev_time
+                        klines = extractor.fetch_klines(
+                            symbol,
+                            interval="1m",
+                            limit=10,
+                            start_time=start_time
+                        )
+                        
+                        if klines and len(klines) > 0:
+                            filepath = extractor.save_to_datalake(klines, symbol, "klines")
+                            if filepath:
+                                self.process_file(filepath)
+                                print(f"   ✅ Refetched and fixed {len(klines)} records")
+                
+                # Check for flat candles (open = close) - potential data quality issue
+                cursor.execute("""
+                    SELECT open_time, open_price, close_price
+                    FROM fact_klines
+                    WHERE symbol = %s 
+                        AND interval_code = '1m'
+                        AND ABS(open_price - close_price) <= 0.1
+                        AND open_time >= NOW() - INTERVAL 1 DAY
+                    ORDER BY open_time DESC
+                    LIMIT 200
+                """, (symbol,))
+                
+                flat_candles = cursor.fetchall()
+                
+                if flat_candles:
+                    print(f"\n⚠️  {symbol}: Found {len(flat_candles)} flat candle(s) (open=close)")
+                    for candle_time, open_p, close_p in flat_candles:
+                        print(f"   🔧 Refetching: {candle_time} (open={open_p:.2f}, close={close_p:.2f})")
+                        
+                        # Delete flat candle
+                        cursor.execute("""
+                            DELETE FROM fact_klines 
+                            WHERE symbol = %s 
+                                AND interval_code = '1m'
+                                AND open_time = %s
+                        """, (symbol, candle_time))
+                        conn.commit()
+                        
+                        # Fetch fresh data
+                        klines = extractor.fetch_klines(
+                            symbol,
+                            interval="1m",
+                            limit=5,
+                            start_time=candle_time
+                        )
+                        
+                        if klines and len(klines) > 0:
+                            filepath = extractor.save_to_datalake(klines, symbol, "klines")
+                            if filepath:
+                                # Force process to bypass duplicate check
+                                self.process_file(filepath, force_process=True)
+                                print(f"   ✅ Refetched {len(klines)} records")
+                
+                # STEP 1: Check if we're missing recent data (latest DB → now)
+                cursor.execute("""
+                    SELECT MAX(open_time) as latest_time
+                    FROM fact_klines
+                    WHERE symbol = %s AND interval_code = '1m'
+                """, (symbol,))
+                result = cursor.fetchone()
+                latest_time = result[0] if result else None
+                
+                if latest_time:
+                    now = datetime.now()
+                    minutes_since_latest = int((now - latest_time).total_seconds() / 60)
+                    
+                    # If gap from latest to now > 2 minutes, fetch missing data
+                    if minutes_since_latest > 2:
+                        print(f"\n🔧 {symbol}: Missing recent data (gap: {minutes_since_latest}m from {latest_time})")
+                        start_time = latest_time + timedelta(minutes=1)
+                        limit = min(minutes_since_latest + 10, 1000)
+                        
+                        klines = extractor.fetch_klines(
+                            symbol, 
+                            interval="1m", 
+                            limit=limit,
+                            start_time=start_time
+                        )
+                        
+                        if klines and len(klines) > 0:
+                            filepath = extractor.save_to_datalake(klines, symbol, "klines")
+                            if filepath:
+                                self.process_file(filepath)
+                                print(f"   ✅ Filled {len(klines)} recent records")
+                
+                # STEP 2: Find gaps in historical data
+                cursor.execute("""
+                    SELECT 
+                        t1.open_time as gap_start,
+                        MIN(t2.open_time) as gap_end,
+                        TIMESTAMPDIFF(MINUTE, t1.open_time, MIN(t2.open_time)) as gap_minutes
+                    FROM fact_klines t1
+                    LEFT JOIN fact_klines t2 
+                        ON t1.symbol = t2.symbol 
+                        AND t2.open_time > t1.open_time
+                    WHERE t1.symbol = %s
+                        AND t1.interval_code = '1m'
+                    GROUP BY t1.open_time
+                    HAVING gap_minutes > 1
+                    ORDER BY gap_start
+                    LIMIT 10
+                """, (symbol,))
+                
+                gaps = cursor.fetchall()
+                cursor.close()
+                conn.close()
+                
+                if gaps:
+                    print(f"\n🔧 {symbol}: Found {len(gaps)} historical gap(s)")
+                    for gap_start, gap_end, gap_minutes in gaps:
+                        if gap_minutes > 1000:
+                            print(f"   ⚠️  Gap too large ({gap_minutes}m), skipping: {gap_start} → {gap_end}")
+                            continue
+                        
+                        print(f"   📥 Filling gap: {gap_start} → {gap_end} ({gap_minutes} minutes)")
+                        
+                        # Fetch data to fill the gap
+                        start_time = gap_start + timedelta(minutes=1)
+                        klines = extractor.fetch_klines(
+                            symbol, 
+                            interval="1m", 
+                            limit=min(gap_minutes + 10, 1000),
+                            start_time=start_time
+                        )
+                        
+                        if klines and len(klines) > 0:
+                            # Save to datalake
+                            filepath = extractor.save_to_datalake(klines, symbol, "klines")
+                            if filepath:
+                                # Process immediately
+                                self.process_file(filepath)
+                                print(f"   ✅ Filled {len(klines)} records")
+                
+                if not gaps and not integrity_issues and latest_time:
+                    minutes_since = int((datetime.now() - latest_time).total_seconds() / 60)
+                    if minutes_since <= 2:
+                        print(f"✨ {symbol}: No gaps detected, data up-to-date")
+                    
+            except Exception as e:
+                print(f"❌ Error detecting gaps for {symbol}: {e}")
+                import traceback
+                traceback.print_exc()

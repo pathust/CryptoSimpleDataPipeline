@@ -136,13 +136,22 @@ class ExtractionManager:
             
             # If we have previous data, fetch from that time + 1 minute
             start_time = None
+            limit = 100  # Default for first fetch
+            
             if last_time:
                 start_time = last_time + timedelta(minutes=1)
-                print(f"📊 {symbol}: Fetching new klines since {start_time}")
+                # Calculate how many minutes since last fetch
+                now = datetime.now()
+                minutes_gap = int((now - start_time).total_seconds() / 60)
+                
+                # Binance API limit is 1000 candles per request
+                limit = min(minutes_gap + 10, 1000)  # +10 buffer, max 1000
+                
+                print(f"📊 {symbol}: Fetching new klines since {start_time} (gap: {minutes_gap}m, limit: {limit})")
             else:
-                print(f"📊 {symbol}: First fetch (100 records)")
+                print(f"📊 {symbol}: First fetch ({limit} records)")
             
-            klines = self.fetch_klines(symbol, start_time=start_time)
+            klines = self.fetch_klines(symbol, start_time=start_time, limit=limit)
             
             if klines and len(klines) > 0:
                 f1 = self.save_to_datalake(klines, symbol, "klines")

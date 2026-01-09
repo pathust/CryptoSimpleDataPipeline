@@ -2,14 +2,20 @@ import { useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { getOrderbookSnapshot } from "@/lib/api-client";
 
-export function Orderbook() {
+interface OrderbookProps {
+  symbol: string;
+}
+
+export function Orderbook({ symbol }: OrderbookProps) {
   const [orderbook, setOrderbook] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadOrderbook = async () => {
       try {
-        const data = await getOrderbookSnapshot("BTCUSDT", 10);
+        // Convert URL format (BTC_USDT) to API format (BTCUSDT)
+        const apiSymbol = symbol.replace('_', '');
+        const data = await getOrderbookSnapshot(apiSymbol, 10);
         setOrderbook(data);
       } catch (error) {
         console.error("Failed to load orderbook:", error);
@@ -18,13 +24,13 @@ export function Orderbook() {
       }
     };
     loadOrderbook();
-    
+
     // Refresh every 5 seconds
     const interval = setInterval(loadOrderbook, 5000);
     return () => clearInterval(interval);
-  }, []);
+  }, [symbol]); // Reload when symbol changes
 
-  if (loading)  {
+  if (loading) {
     return (
       <Card className="glass p-4">
         <h3 className="text-sm font-medium mb-4 text-foreground">Order Book</h3>
@@ -49,7 +55,7 @@ export function Orderbook() {
   return (
     <Card className="glass p-4">
       <h3 className="text-sm font-medium mb-4 text-foreground">Order Book</h3>
-      
+
       {/* Asks (Sell) */}
       <div className="space-y-1 mb-3">
         <p className="text-xs text-red-400 font-medium">Asks (Sell)</p>
@@ -60,16 +66,16 @@ export function Orderbook() {
           </div>
         ))}
       </div>
-      
+
       {/* Spread */}
       <div className="border-t border-b border-border/50 py-2 mb-3">
         <div className=" text-xs text-center text-muted-foreground">
-          Spread: {orderbook.asks?.[0] && orderbook.bids?.[0] 
+          Spread: {orderbook.asks?.[0] && orderbook.bids?.[0]
             ? `$${(orderbook.asks[0].price - orderbook.bids[0].price).toFixed(2)}`
             : 'N/A'}
         </div>
       </div>
-      
+
       {/* Bids (Buy) */}
       <div className="space-y-1">
         <p className="text-xs text-green-400 font-medium">Bids (Buy)</p>
