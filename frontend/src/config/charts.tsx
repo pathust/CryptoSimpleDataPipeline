@@ -14,7 +14,11 @@ import { VolumeChart } from "@/components/charts/VolumeChart";
 import { RSIChart } from "@/components/charts/RSIChart";
 import { MACDChart } from "@/components/charts/MACDChart";
 import { BollingerChart } from "@/components/charts/BollingerChart";
-
+import { OrderBookChart } from "@/components/charts/OrderBookChart";
+import { SpreadChart } from "@/components/charts/SpreadChart";
+import { DailyTrendChart } from "@/components/charts/DailyTrendChart";
+import { CalendarRange } from "lucide-react"; // Import icon
+import { Layers, BarChartHorizontal } from "lucide-react";
 export const CHART_REGISTRY: ChartConfig[] = [
     {
         id: 'candlestick',
@@ -81,6 +85,39 @@ export const CHART_REGISTRY: ChartConfig[] = [
         gridSpan: { cols: 3, rows: 1 },
         defaultParams: { period: 20, std_dev: 2, limit: 200 },
     },
+    {
+        id: 'order_book',
+        title: 'Order Book Depth',
+        description: 'Real-time bid/ask market depth',
+        component: OrderBookChart,
+        dataProvider: 'orderbook',
+        category: 'market',
+        icon: Layers,
+        gridSpan: { cols: 2 },
+        refreshInterval: 10000 // 10s refresh
+    },
+    {
+        id: 'spread_history',
+        title: 'Bid-Ask Spread',
+        description: 'Price gap between buy and sell orders',
+        component: SpreadChart,
+        dataProvider: 'spread',
+        category: 'market',
+        icon: Activity,
+        gridSpan: { cols: 1 },
+        refreshInterval: 5000 // Spread đổi nhanh, refresh 5s
+    },
+    {
+        id: 'daily_trend',
+        title: 'Daily History',
+        description: '30-day price & volume trend',
+        component: DailyTrendChart,
+        dataProvider: 'daily_trend',
+        category: 'market',
+        icon: CalendarRange,
+        gridSpan: { cols: 2 }, // Chart ngày nên để rộng (2 cột)
+        refreshInterval: 60000 // Dữ liệu ngày ít đổi, 60s là đủ
+    }
 ];
 
 /**
