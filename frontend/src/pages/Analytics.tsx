@@ -9,7 +9,7 @@ import { useState } from "react";
 import { useParams, Navigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ChartContainer } from "@/components/charts/ChartContainer";
-import { ChartSelector } from "@/components/analytics/ChartSelector";
+import { ChartSelector } from "@/components/charts/ChartSelector";
 import { CHART_REGISTRY, getDefaultEnabledCharts } from "@/config/charts";
 
 const VALID_SYMBOLS = ['BTC_USDT', 'ETH_USDT', 'BNB_USDT'];
