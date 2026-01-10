@@ -325,12 +325,18 @@ def get_analytics_data(provider, symbol):
     Usage: GET /api/analytics/data/rsi/BTCUSDT?period=14&limit=200
     """
     try:
+        print(f"🔍 Analytics API: Request for provider='{provider}', symbol='{symbol}'")
+        
         data_provider = DataProviderRegistry.get(provider)
         if not data_provider:
+            print(f"❌ Analytics API: Unknown provider '{provider}'")
             return jsonify({"error": f"Unknown provider: {provider}"}), 404
+        
+        print(f"✅ Analytics API: Found provider '{provider}'")
         
         # Get all query parameters
         params = {k: v for k, v in request.args.items()}
+        print(f"📊 Analytics API: Parameters", params)
         
         # Convert numeric parameters
         for key in ['limit', 'period', 'fast_period', 'slow_period', 'signal_period']:
@@ -347,10 +353,20 @@ def get_analytics_data(provider, symbol):
                 except ValueError:
                     pass
         
+        print(f"🔄 Analytics API: Calling provider.get_data()...")
         data = data_provider.get_data(symbol, **params)
+        
+        print(f"✅ Analytics API: Provider returned data type={type(data)}, length={len(data) if hasattr(data, '__len__') else 'N/A'}")
+        
+        # Log sample data for debugging
+        if isinstance(data, list) and len(data) > 0:
+            print(f"📊 Analytics API: Sample data (first item)", data[0])
+        elif isinstance(data, dict):
+            print(f"📊 Analytics API: Data keys", list(data.keys()))
+        
         return jsonify(data)
     except Exception as e:
-        print(f"Error in analytics data provider: {e}")
+        print(f"❌ Analytics API: Error in analytics data provider: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({"error": str(e)}), 500

@@ -6,11 +6,14 @@ making it easy to add new providers and access them via a unified interface.
 """
 
 from .candlestick import CandlestickProvider
+from .candlestick_enhanced import CandlestickEnhancedProvider
 from .volume import VolumeProvider
 from .rsi import RSIProvider
 from .macd import MACDProvider
 from .bollinger import BollingerProvider
 from .orderbook import OrderbookProvider
+from .orderbook_depth import OrderbookDepthProvider
+from .fear_greed_gauge import FearGreedGaugeProvider
 
 
 class DataProviderRegistry:
@@ -69,8 +72,11 @@ class DataProviderRegistry:
 
 # Auto-register all providers
 DataProviderRegistry.register('candlestick', CandlestickProvider)
+DataProviderRegistry.register('candlestick_enhanced', CandlestickEnhancedProvider)
 DataProviderRegistry.register('volume', VolumeProvider)
 DataProviderRegistry.register('rsi', RSIProvider)
 DataProviderRegistry.register('macd', MACDProvider)
 DataProviderRegistry.register('bollinger', BollingerProvider)
 DataProviderRegistry.register('orderbook', OrderbookProvider)
+DataProviderRegistry.register('orderbook_depth', OrderbookDepthProvider)
+DataProviderRegistry.register('fear_greed_gauge', FearGreedGaugeProvider)

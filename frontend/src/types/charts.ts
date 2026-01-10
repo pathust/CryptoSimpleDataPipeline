@@ -32,7 +32,7 @@ export interface ChartConfig {
     description: string;
 
     /** Category for grouping */
-    category: 'primary' | 'indicator' | 'market' | 'custom';
+    category: 'primary' | 'indicator' | 'market' | 'sentiment' | 'custom';
 
     /** Icon component (from lucide-react) */
     icon: ComponentType<{ className?: string }>;
