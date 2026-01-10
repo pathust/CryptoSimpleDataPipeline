@@ -313,6 +313,57 @@ def get_deduplication_stats():
     stats = visualize_svc.get_deduplication_stats()
     return jsonify(stats)
 
+# ========== GENERIC ANALYTICS DATA PROVIDER ENDPOINTS ==========
+
+from src.modules.analytics.data_providers.registry import DataProviderRegistry
+
+@app.route('/api/analytics/data/<provider>/<symbol>')
+def get_analytics_data(provider, symbol):
+    """
+    Generic endpoint for analytics data using the provider system.
+    
+    Usage: GET /api/analytics/data/rsi/BTCUSDT?period=14&limit=200
+    """
+    try:
+        data_provider = DataProviderRegistry.get(provider)
+        if not data_provider:
+            return jsonify({"error": f"Unknown provider: {provider}"}), 404
+        
+        # Get all query parameters
+        params = {k: v for k, v in request.args.items()}
+        
+        # Convert numeric parameters
+        for key in ['limit', 'period', 'fast_period', 'slow_period', 'signal_period']:
+            if key in params:
+                try:
+                    params[key] = int(params[key])
+                except ValueError:
+                    pass
+        
+        for key in ['std_dev']:
+            if key in params:
+                try:
+                    params[key] = float(params[key])
+                except ValueError:
+                    pass
+        
+        data = data_provider.get_data(symbol, **params)
+        return jsonify(data)
+    except Exception as e:
+        print(f"Error in analytics data provider: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+@app.route('/api/analytics/providers')
+def list_analytics_providers():
+    """List all available data providers with their metadata."""
+    try:
+        providers = DataProviderRegistry.list_providers()
+        return jsonify(providers)
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/api/pipeline/storage-health')
 def get_storage_health():
     """Get storage health metrics."""

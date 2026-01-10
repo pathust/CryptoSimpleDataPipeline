@@ -33,7 +33,23 @@ A professional-grade cryptocurrency data pipeline and analytics platform with in
 - **Responsive Design**: Works on desktop and tablet
 - **Data Tables**: View and export raw k-lines and orderbook data with pagination
 
-## 🚦 Quick Start
+## 📚 Documentation
+
+Comprehensive documentation is available in the [`docs/`](docs/) directory:
+
+| Document | Description |
+|----------|-------------|
+| [📐 Architecture](docs/ARCHITECTURE.md) | System design, components, and technology stack |
+| [🔄 Data Pipeline](docs/DATA_PIPELINE.md) | Complete data flow from source to visualization |
+| [🔌 API Reference](docs/API_REFERENCE.md) | All API endpoints with examples |
+| [⚛️ Frontend](docs/FRONTEND.md) | React/TypeScript architecture and components |
+| [🐍 Backend](docs/BACKEND.md) | Python modules and Flask application |
+| [🗄️ Database Schema](docs/DATABASE_SCHEMA.md) | Complete database schema and ER diagrams |
+| [🚀 Deployment](docs/DEPLOYMENT.md) | Production deployment guide |
+| [👨‍💻 Developer Guide](DEVELOPER_GUIDE.md) | Development setup and best practices |
+
+**Start Here**: New to the project? Begin with the [Architecture](docs/ARCHITECTURE.md) document, then review the [Data Pipeline](docs/DATA_PIPELINE.md) to understand how data flows through the system.
+
 
 ### Prerequisites
 - Python 3.12+

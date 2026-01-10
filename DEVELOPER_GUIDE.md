@@ -2,6 +2,18 @@
 
 This guide is for developers who want to understand, extend, or contribute to the Crypto Analytics Platform.
 
+## 📖 Documentation Index
+
+Before diving into development, familiarize yourself with the complete documentation:
+
+- **[Architecture](docs/ARCHITECTURE.md)** - System design and component overview
+- **[Data Pipeline](docs/DATA_PIPELINE.md)** - How data flows through the system
+- **[API Reference](docs/API_REFERENCE.md)** - Complete API documentation
+- **[Frontend](docs/FRONTEND.md)** - React/TypeScript architecture
+- **[Backend](docs/BACKEND.md)** - Python modules and services
+- **[Database Schema](docs/DATABASE_SCHEMA.md)** - Database tables and relationships
+- **[Deployment](docs/DEPLOYMENT.md)** - Production deployment guide
+
 ## 📚 Table of Contents
 
 1. [Architecture Overview](#architecture-overview)
