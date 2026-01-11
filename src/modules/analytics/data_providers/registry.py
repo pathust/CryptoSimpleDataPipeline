@@ -11,8 +11,7 @@ from .rsi import RSIProvider
 from .macd import MACDProvider
 from .bollinger import BollingerProvider
 from .schema_debug import SchemaDebugProvider
-from .spread import SpreadProvider
-from .daily_trend import DailyTrendProvider
+
 from .orderbook import OrderBookProvider
 class DataProviderRegistry:
     """Central registry for all analytics data providers."""
@@ -76,5 +75,3 @@ DataProviderRegistry.register('macd', MACDProvider)
 DataProviderRegistry.register('bollinger', BollingerProvider)
 DataProviderRegistry.register('schema_debug', SchemaDebugProvider)
 DataProviderRegistry.register('orderbook', OrderBookProvider)
-DataProviderRegistry.register('spread', SpreadProvider)
-DataProviderRegistry.register('daily_trend', DailyTrendProvider)

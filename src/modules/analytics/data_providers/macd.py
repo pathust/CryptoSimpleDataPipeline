@@ -11,19 +11,6 @@ class MACDProvider(DataProvider):
     """Provider for MACD indicator data."""
     
     def get_data(self, symbol: str, **params):
-        """
-        Get MACD indicator data.
-        
-        Args:
-            symbol: Trading pair symbol
-            fast_period: Fast EMA period (default: 12)
-            slow_period: Slow EMA period (default: 26)
-            signal_period: Signal line period (default: 9)
-            limit: Number of data points (default: 200)
-            
-        Returns:
-            List of MACD data points with time, macd, signal, histogram
-        """
         fast_period = params.get('fast_period', 12)
         slow_period = params.get('slow_period', 26)
         signal_period = params.get('signal_period', 9)
@@ -32,7 +19,7 @@ class MACDProvider(DataProvider):
         try:
             conn = self._get_connection()
             
-            # Fetch more data than needed for calculation
+            # Fetch data (lấy dư ra để tính EMA ban đầu cho chính xác)
             fetch_limit = limit + slow_period + signal_period + 50
             query = """
             SELECT 
@@ -50,8 +37,11 @@ class MACDProvider(DataProvider):
             if df.empty or len(df) < slow_period + signal_period:
                 return []
             
-            # Reverse to get chronological order
-            df = df.iloc[::-1]
+            # 1. FIX QUAN TRỌNG: Ép kiểu sang float để numpy tính toán được
+            df['close_price'] = df['close_price'].astype(float)
+            
+            # Reverse to get chronological order (Cũ nhất lên đầu)
+            df = df.iloc[::-1].reset_index(drop=True)
             
             # Calculate EMAs
             prices = df['close_price'].values
@@ -66,24 +56,27 @@ class MACDProvider(DataProvider):
             macd_line = ema_fast - ema_slow
             
             # Signal line (EMA of MACD)
-            signal_line = self._calculate_ema(macd_line[slow_period:], signal_period)
+            # Lưu ý: Signal line tính trên MACD line, bỏ qua đoạn đầu chưa ổn định
+            signal_line = self._calculate_ema(macd_line, signal_period)
             
             # Histogram
-            histogram = macd_line[slow_period + signal_period - 1:] - signal_line
+            histogram = macd_line - signal_line
             
             # Prepare result
             result = []
-            start_idx = slow_period + signal_period - 1
-            for i in range(len(histogram)):
-                idx = start_idx + i
-                if idx < len(df):
-                    open_time_utc = df.iloc[idx]['open_time'].replace(tzinfo=None).isoformat() + 'Z'
-                    result.append({
-                        'time': open_time_utc,
-                        'macd': round(float(macd_line[idx]), 8),
-                        'signal': round(float(signal_line[i]), 8),
-                        'histogram': round(float(histogram[i]), 8)
-                    })
+            # Chỉ lấy dữ liệu từ điểm đã có đủ cả MACD và Signal
+            start_idx = slow_period + signal_period
+            
+            for i in range(len(df)):
+                if i < start_idx: continue # Bỏ qua đoạn đầu chưa tính đủ chỉ báo
+                
+                open_time_utc = df.iloc[i]['open_time'].replace(tzinfo=None).isoformat() + 'Z'
+                result.append({
+                    'time': open_time_utc,
+                    'macd': round(float(macd_line[i]), 8),
+                    'signal': round(float(signal_line[i]), 8),
+                    'histogram': round(float(histogram[i]), 8)
+                })
             
             # Return only requested limit
             return result[-limit:]
@@ -97,41 +90,24 @@ class MACDProvider(DataProvider):
         ema = np.zeros(len(data))
         multiplier = 2 / (period + 1)
         
-        # Start with SMA
-        ema[period - 1] = np.mean(data[:period])
+        # Start with SMA for the first valid point
+        # (Cách đơn giản: Lấy phần tử đầu tiên làm EMA đầu tiên)
+        ema[0] = data[0] 
         
-        # Calculate EMA
-        for i in range(period, len(data)):
+        # Calculate EMA recursive
+        for i in range(1, len(data)):
             ema[i] = (data[i] - ema[i - 1]) * multiplier + ema[i - 1]
         
         return ema
     
     def get_metadata(self):
-        """Return metadata about this provider."""
         return {
             'name': 'MACD',
-            'description': 'Moving Average Convergence Divergence - trend indicator',
+            'description': 'Trend indicator',
             'parameters': {
-                'fast_period': {
-                    'type': 'integer',
-                    'default': 12,
-                    'description': 'Fast EMA period'
-                },
-                'slow_period': {
-                    'type': 'integer',
-                    'default': 26,
-                    'description': 'Slow EMA period'
-                },
-                'signal_period': {
-                    'type': 'integer',
-                    'default': 9,
-                    'description': 'Signal line period'
-                },
-                'limit': {
-                    'type': 'integer',
-                    'default': 200,
-                    'description': 'Number of data points'
-                }
-            },
-            'data_format': 'Array of {time, macd, signal, histogram}'
+                'fast_period': {'type': 'integer', 'default': 12},
+                'slow_period': {'type': 'integer', 'default': 26},
+                'signal_period': {'type': 'integer', 'default': 9},
+                'limit': {'type': 'integer', 'default': 200}
+            }
         }
