@@ -1,4 +1,5 @@
 import { ComposedChart, Line, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Cell } from 'recharts';
+import { formatChartTime } from '@/utils/timeFormat';
 
 interface MACDDataPoint {
     time: string;
@@ -20,9 +21,9 @@ export function MACDChart({ data }: ChartProps) {
         );
     }
 
-    // Transform data for Recharts
+    // Format time to match candlestick chart (lightweight-charts)
     const chartData = data.map((item: MACDDataPoint) => ({
-        time: new Date(item.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        time: formatChartTime(item.time), // HH:MM format, matches candlestick chart
         macd: item.macd,
         signal: item.signal,
         histogram: item.histogram,

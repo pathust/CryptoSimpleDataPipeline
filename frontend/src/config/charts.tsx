@@ -7,7 +7,7 @@
  * 3. Done! Chart will automatically appear in Analytics page
  */
 
-import { LineChart, BarChart3, TrendingUp, Activity, Waves } from "lucide-react";
+import { LineChart, BarChart3, TrendingUp, Activity, Waves, GitBranch, Gauge, BarChartHorizontal, PieChart } from "lucide-react";
 import { ChartConfig } from "@/types/charts";
 import { CandlestickChartWrapper } from "@/components/charts/CandlestickChartWrapper";
 import { VolumeChart } from "@/components/charts/VolumeChart";
@@ -15,7 +15,11 @@ import { RSIChart } from "@/components/charts/RSIChart";
 import { MACDChart } from "@/components/charts/MACDChart";
 import { BollingerChart } from "@/components/charts/BollingerChart";
 import { OrderBookChart } from "@/components/charts/OrderBookChart";
-import { Layers, BarChartHorizontal } from "lucide-react";
+import { CorrelationChart } from "@/components/charts/CorrelationChart";
+import { ATRChart } from "@/components/charts/ATRChart";
+import { VolumeProfileChart } from "@/components/charts/VolumeProfileChart";
+import { ReturnDistributionChart } from "@/components/charts/ReturnDistributionChart";
+import { Layers } from "lucide-react";
 export const CHART_REGISTRY: ChartConfig[] = [
     {
         id: 'candlestick',
@@ -92,6 +96,58 @@ export const CHART_REGISTRY: ChartConfig[] = [
         icon: Layers,
         gridSpan: { cols: 3, rows: 1 },
         refreshInterval: 10000 // 10s refresh
+    },
+    {
+        id: 'correlation',
+        title: 'Price Correlation',
+        description: 'Correlation between base coin and two comparison coins',
+        category: 'indicator',
+        icon: GitBranch,
+        component: CorrelationChart,
+        defaultEnabled: false,
+        dataProvider: 'correlation',
+        refreshInterval: 15000,
+        gridSpan: { cols: 3, rows: 1 },
+        defaultParams: { window: 20, limit: 200, interval: '1m' },
+    },
+    {
+        id: 'atr',
+        title: 'ATR (14)',
+        description: 'Average True Range - volatility indicator',
+        category: 'indicator',
+        icon: Gauge,
+        component: ATRChart,
+        defaultEnabled: false,
+        dataProvider: 'atr',
+        refreshInterval: 15000,
+        gridSpan: { cols: 3, rows: 1 },
+        defaultParams: { period: 14, limit: 200 },
+    },
+    {
+        id: 'volume_profile',
+        title: 'Volume Profile',
+        description: 'Volume distribution across price levels - Support/Resistance Analysis',
+        category: 'market',
+        icon: BarChartHorizontal,
+        component: VolumeProfileChart,
+        defaultEnabled: false,
+        dataProvider: 'volume_profile',
+        refreshInterval: 30000, // 30 seconds
+        gridSpan: { cols: 3, rows: 2 },
+        defaultParams: { bins: 20, limit: 200 },
+    },
+    {
+        id: 'return_distribution',
+        title: 'Return Distribution',
+        description: 'Distribution of price returns - Risk Analysis',
+        category: 'market',
+        icon: PieChart,
+        component: ReturnDistributionChart,
+        defaultEnabled: false,
+        dataProvider: 'return_distribution',
+        refreshInterval: 30000, // 30 seconds
+        gridSpan: { cols: 3, rows: 1 },
+        defaultParams: { bins: 30, limit: 200 },
     },
 ];
 

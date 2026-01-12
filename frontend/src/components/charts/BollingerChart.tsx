@@ -10,6 +10,7 @@ import {
   TooltipProps,
 } from 'recharts';
 import { ChartProps } from '@/types/charts';
+import { formatChartTime } from '@/utils/timeFormat';
 
 // Cấu hình màu (Giữ nguyên theme tối)
 const THEME = {
@@ -96,12 +97,9 @@ export function BollingerChart({ data }: ChartProps) {
     );
   }
 
+  // Format time to match candlestick chart (lightweight-charts)
   const chartData = data.map((item: BollingerDataPoint) => ({
-    time: new Date(item.time).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }),
+    time: formatChartTime(item.time), // HH:MM format, matches candlestick chart
     upper: item.upper,
     middle: item.middle,
     lower: item.lower,

@@ -4,6 +4,7 @@
 
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { ChartProps } from '@/types/charts';
+import { formatChartTime } from '@/utils/timeFormat';
 
 interface VolumeDataPoint {
     time: string;
@@ -28,8 +29,9 @@ export function VolumeChart({ data }: ChartProps) {
         );
     }
 
+    // Format time to match candlestick chart (lightweight-charts)
     const chartData = data.map((item: VolumeDataPoint) => ({
-        time: new Date(item.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+        time: formatChartTime(item.time), // HH:MM format, matches candlestick chart
         volume: item.volume,
         price: item.price,
         open: item.open || item.price,

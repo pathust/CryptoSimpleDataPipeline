@@ -333,7 +333,7 @@ def get_analytics_data(provider, symbol):
         params = {k: v for k, v in request.args.items()}
         
         # Convert numeric parameters
-        for key in ['limit', 'period', 'fast_period', 'slow_period', 'signal_period']:
+        for key in ['limit', 'period', 'fast_period', 'slow_period', 'signal_period', 'window', 'bins']:
             if key in params:
                 try:
                     params[key] = int(params[key])
