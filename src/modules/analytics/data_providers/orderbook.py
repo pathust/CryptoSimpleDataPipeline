@@ -1,95 +1,57 @@
-"""
-Order book data provider for market depth visualization.
-"""
-
+import pandas as pd
 from .base import DataProvider
 
-
-class OrderbookProvider(DataProvider):
-    """Provider for order book depth data."""
-    
+class OrderBookProvider(DataProvider):
     def get_data(self, symbol: str, **params):
-        """
-        Get latest orderbook snapshot.
-        
-        Args:
-            symbol: Trading pair symbol
-            limit: Number of price levels per side (default: 20)
-            
-        Returns:
-            Dictionary with bids, asks, and timestamp
-        """
-        limit = params.get('limit', 20)
-        
         try:
             conn = self._get_connection()
-            cursor = conn.cursor(dictionary=True)
             
-            # Get latest timestamp
-            cursor.execute("""
-                SELECT MAX(captured_at) as latest
-                FROM fact_orderbook
-                WHERE symbol = %s
-            """, (symbol,))
+            # 1. Tìm thời điểm snapshot mới nhất của symbol đó
+            # Lưu ý: Dùng captured_at như trong schema bạn gửi
+            query_time = "SELECT MAX(captured_at) FROM fact_orderbook WHERE symbol = %s"
+            latest_time = pd.read_sql(query_time, conn, params=(symbol,)).iloc[0, 0]
             
-            result = cursor.fetchone()
-            if not result or not result['latest']:
-                conn.close()
-                return {'bids': [], 'asks': [], 'timestamp': None}
+            if not latest_time:
+                return {'bids': [], 'asks': []}
+
+            # 2. Lấy dữ liệu tại thời điểm đó
+            query_data = """
+            SELECT side, price, quantity
+            FROM fact_orderbook
+            WHERE symbol = %s AND captured_at = %s
+            ORDER BY price ASC
+            """
             
-            latest_time = result['latest']
-            
-            # Get bids (buy orders)
-            cursor.execute("""
-                SELECT price, quantity
-                FROM fact_orderbook
-                WHERE symbol = %s 
-                AND side = 'bid'
-                AND captured_at = %s
-                ORDER BY price DESC
-                LIMIT %s
-            """, (symbol, latest_time, limit))
-            
-            bids = [{'price': float(row['price']), 'quantity': float(row['quantity'])} 
-                   for row in cursor.fetchall()]
-            
-            # Get asks (sell orders)
-            cursor.execute("""
-                SELECT price, quantity
-                FROM fact_orderbook
-                WHERE symbol = %s 
-                AND side = 'ask'
-                AND captured_at = %s
-                ORDER BY price ASC
-                LIMIT %s
-            """, (symbol, latest_time, limit))
-            
-            asks = [{'price': float(row['price']), 'quantity': float(row['quantity'])} 
-                   for row in cursor.fetchall()]
-            
+            df = pd.read_sql(query_data, conn, params=(symbol, latest_time))
             conn.close()
             
+            if df.empty:
+                return {'bids': [], 'asks': []}
+            
+            # Chuẩn hóa dữ liệu về float
+            df['price'] = df['price'].astype(float)
+            df['quantity'] = df['quantity'].astype(float)
+            
+            # 3. Tách Bid/Ask dựa trên value 'bid' trong schema
+            # Giả định bên bán là 'ask'
+            bids_df = df[df['side'] == 'bid'].sort_values('price', ascending=False)
+            asks_df = df[df['side'] == 'ask'].sort_values('price', ascending=True)
+            
+            # 4. Tính tổng tích lũy (Cumulative Sum) để vẽ dốc
+            bids_df['total'] = bids_df['quantity'].cumsum()
+            asks_df['total'] = asks_df['quantity'].cumsum()
+            
             return {
-                'bids': bids,
-                'asks': asks,
-                'timestamp': latest_time.isoformat() if latest_time else None
+                'bids': bids_df[['price', 'quantity', 'total']].to_dict('records'),
+                'asks': asks_df[['price', 'quantity', 'total']].to_dict('records')
             }
             
         except Exception as e:
             print(f"Error getting orderbook: {e}")
-            return {'bids': [], 'asks': [], 'timestamp': None}
+            return {'bids': [], 'asks': []}
     
     def get_metadata(self):
-        """Return metadata about this provider."""
         return {
             'name': 'Order Book',
-            'description': 'Market depth with bid/ask price levels',
-            'parameters': {
-                'limit': {
-                    'type': 'integer',
-                    'default': 20,
-                    'description': 'Number of price levels per side'
-                }
-            },
-            'data_format': '{bids: [{price, quantity}], asks: [{price, quantity}], timestamp}'
+            'parameters': {}
         }

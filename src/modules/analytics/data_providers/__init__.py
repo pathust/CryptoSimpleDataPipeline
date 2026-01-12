@@ -13,7 +13,7 @@ from .volume import VolumeProvider
 from .rsi import RSIProvider
 from .macd import MACDProvider
 from .bollinger import BollingerProvider
-from .orderbook import OrderbookProvider
+from .orderbook import OrderBookProvider
 
 __all__ = [
     'DataProvider',
@@ -23,5 +23,5 @@ __all__ = [
     'RSIProvider',
     'MACDProvider',
     'BollingerProvider',
-    'OrderbookProvider',
+    'OrderBookProvider',
 ]

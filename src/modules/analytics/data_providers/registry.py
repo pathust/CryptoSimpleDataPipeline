@@ -10,9 +10,14 @@ from .volume import VolumeProvider
 from .rsi import RSIProvider
 from .macd import MACDProvider
 from .bollinger import BollingerProvider
-from .orderbook import OrderbookProvider
+from .schema_debug import SchemaDebugProvider
+from .correlation import CorrelationProvider
+from .atr import ATRProvider
+from .volume_profile import VolumeProfileProvider
+from .price_distribution import PriceDistributionProvider
+from .return_distribution import ReturnDistributionProvider
 
-
+from .orderbook import OrderBookProvider
 class DataProviderRegistry:
     """Central registry for all analytics data providers."""
     
@@ -73,4 +78,10 @@ DataProviderRegistry.register('volume', VolumeProvider)
 DataProviderRegistry.register('rsi', RSIProvider)
 DataProviderRegistry.register('macd', MACDProvider)
 DataProviderRegistry.register('bollinger', BollingerProvider)
-DataProviderRegistry.register('orderbook', OrderbookProvider)
+DataProviderRegistry.register('schema_debug', SchemaDebugProvider)
+DataProviderRegistry.register('correlation', CorrelationProvider)
+DataProviderRegistry.register('atr', ATRProvider)
+DataProviderRegistry.register('volume_profile', VolumeProfileProvider)
+DataProviderRegistry.register('price_distribution', PriceDistributionProvider)
+DataProviderRegistry.register('return_distribution', ReturnDistributionProvider)
+DataProviderRegistry.register('orderbook', OrderBookProvider)

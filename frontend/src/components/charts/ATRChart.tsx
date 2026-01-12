@@ -1,29 +1,30 @@
 /**
- * RSI (Relative Strength Index) chart component.
+ * ATR (Average True Range) chart component.
+ * ATR measures market volatility.
  */
 
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { ChartProps } from '@/types/charts';
 import { formatChartTime } from '@/utils/timeFormat';
 
-interface RSIDataPoint {
+interface ATRDataPoint {
     time: string;
-    rsi: number;
+    atr: number;
 }
 
-export function RSIChart({ data }: ChartProps) {
+export function ATRChart({ data }: ChartProps) {
     if (!data || !Array.isArray(data) || data.length === 0) {
         return (
             <div className="flex items-center justify-center h-64 text-muted-foreground">
-                No RSI data available
+                No ATR data available
             </div>
         );
     }
 
     // Format time to match candlestick chart (lightweight-charts)
-    const chartData = data.map((item: RSIDataPoint) => ({
+    const chartData = data.map((item: ATRDataPoint) => ({
         time: formatChartTime(item.time), // HH:MM format, matches candlestick chart
-        rsi: item.rsi,
+        atr: item.atr,
     }));
 
     return (
@@ -34,16 +35,18 @@ export function RSIChart({ data }: ChartProps) {
                     <XAxis
                         dataKey="time"
                         stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
+                        fontSize={10}
                         tickLine={false}
                         axisLine={false}
+                        minTickGap={30}
+                        interval="preserveStartEnd"
                     />
                     <YAxis
-                        domain={[0, 100]}
                         stroke="hsl(var(--muted-foreground))"
                         fontSize={12}
                         tickLine={false}
                         axisLine={false}
+                        label={{ value: 'ATR', angle: -90, position: 'insideLeft' }}
                     />
                     <Tooltip
                         contentStyle={{
@@ -52,18 +55,12 @@ export function RSIChart({ data }: ChartProps) {
                             borderRadius: '8px',
                         }}
                         labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
-                        formatter={(value: number) => [value.toFixed(2), 'RSI']}
+                        formatter={(value: number) => [value.toFixed(4), 'ATR']}
                     />
-
-                    {/* Overbought line */}
-                    <ReferenceLine y={70} stroke="hsl(var(--destructive))" strokeDasharray="3 3" />
-
-                    {/* Oversold line */}
-                    <ReferenceLine y={30} stroke="hsl(var(--chart-2))" strokeDasharray="3 3" />
 
                     <Line
                         type="monotone"
-                        dataKey="rsi"
+                        dataKey="atr"
                         stroke="hsl(var(--primary))"
                         strokeWidth={2}
                         dot={false}
@@ -71,16 +68,9 @@ export function RSIChart({ data }: ChartProps) {
                 </LineChart>
             </ResponsiveContainer>
 
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-0.5 bg-destructive" />
-                    <span>Overbought (70)</span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-0.5 bg-chart-2" />
-                    <span>Oversold (30)</span>
-                </div>
+            {/* Info */}
+            <div className="flex items-center justify-center text-xs text-muted-foreground">
+                <span>Average True Range - Measures market volatility</span>
             </div>
         </div>
     );

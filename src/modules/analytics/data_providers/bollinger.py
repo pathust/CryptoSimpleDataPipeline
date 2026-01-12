@@ -11,18 +11,6 @@ class BollingerProvider(DataProvider):
     """Provider for Bollinger Bands indicator data."""
     
     def get_data(self, symbol: str, **params):
-        """
-        Get Bollinger Bands indicator data.
-        
-        Args:
-            symbol: Trading pair symbol
-            period: Moving average period (default: 20)
-            std_dev: Number of standard deviations (default: 2)
-            limit: Number of data points (default: 200)
-            
-        Returns:
-            List of Bollinger Bands data points with time, upper, middle, lower
-        """
         period = params.get('period', 20)
         std_dev = params.get('std_dev', 2)
         limit = params.get('limit', 200)
@@ -30,7 +18,7 @@ class BollingerProvider(DataProvider):
         try:
             conn = self._get_connection()
             
-            # Fetch more data than needed for calculation
+            # Fetch data
             query = """
             SELECT 
                 open_time,
@@ -41,73 +29,63 @@ class BollingerProvider(DataProvider):
             LIMIT %s
             """
             
-            df = pd.read_sql(query, conn, params=(symbol, limit + period + 1))
+            # Lấy dư thêm data để tính SMA đoạn đầu chính xác
+            df = pd.read_sql(query, conn, params=(symbol, limit + period + 5))
             conn.close()
             
             if df.empty or len(df) < period:
                 return []
             
-            # Reverse to get chronological order
-            df = df.iloc[::-1]
+            # 1. FIX QUAN TRỌNG: Convert Decimal sang float để numpy tính toán được
+            df['close_price'] = df['close_price'].astype(float)
+
+            # Reverse chronological order (Cũ nhất lên đầu)
+            df = df.iloc[::-1].reset_index(drop=True)
             
-            # Calculate SMA (middle band)
             prices = df['close_price'].values
+
+            # 2. Tính SMA (Middle Band)
+            # mode='valid' sẽ trả về mảng ngắn hơn mảng gốc (len - period + 1)
             sma = np.convolve(prices, np.ones(period) / period, mode='valid')
             
-            # Calculate standard deviation
-            std = []
-            for i in range(len(sma)):
-                window = prices[i:i + period]
-                std.append(np.std(window))
+            # 3. Tính Standard Deviation
+            # Cần tính std cho từng cửa sổ tương ứng với SMA
+            # Cách tối ưu hơn dùng Pandas Rolling thay vì loop
+            df['sma'] = df['close_price'].rolling(window=period).mean()
+            df['std'] = df['close_price'].rolling(window=period).std()
             
-            std = np.array(std)
-            
-            # Calculate upper and lower bands
-            upper_band = sma + (std_dev * std)
-            lower_band = sma - (std_dev * std)
+            # Cắt bỏ các giá trị NaN đầu tiên do rolling
+            df_result = df.dropna().tail(limit)
+
+            # 4. Tính Bands
+            upper_band = df_result['sma'] + (df_result['std'] * std_dev)
+            lower_band = df_result['sma'] - (df_result['std'] * std_dev)
             
             # Prepare result
             result = []
-            for i in range(len(sma)):
-                idx = i + period - 1
-                if idx < len(df):
-                    open_time_utc = df.iloc[idx]['open_time'].replace(tzinfo=None).isoformat() + 'Z'
-                    result.append({
-                        'time': open_time_utc,
-                        'upper': round(float(upper_band[i]), 8),
-                        'middle': round(float(sma[i]), 8),
-                        'lower': round(float(lower_band[i]), 8),
-                        'price': round(float(prices[idx]), 8)
-                    })
+            for idx, row in df_result.iterrows():
+                open_time_utc = row['open_time'].replace(tzinfo=None).isoformat() + 'Z'
+                result.append({
+                    'time': open_time_utc,
+                    'upper': round(float(upper_band[idx]), 8),
+                    'middle': round(float(row['sma']), 8),
+                    'lower': round(float(lower_band[idx]), 8),
+                    'price': round(float(row['close_price']), 8)
+                })
             
-            # Return only requested limit
-            return result[-limit:]
+            return result
             
         except Exception as e:
             print(f"Error calculating Bollinger Bands: {e}")
             return []
     
     def get_metadata(self):
-        """Return metadata about this provider."""
         return {
             'name': 'Bollinger Bands',
-            'description': 'Volatility indicator with upper, middle, and lower bands',
+            'description': 'Volatility indicator',
             'parameters': {
-                'period': {
-                    'type': 'integer',
-                    'default': 20,
-                    'description': 'Moving average period'
-                },
-                'std_dev': {
-                    'type': 'number',
-                    'default': 2,
-                    'description': 'Number of standard deviations'
-                },
-                'limit': {
-                    'type': 'integer',
-                    'default': 200,
-                    'description': 'Number of data points'
-                }
-            },
-            'data_format': 'Array of {time, upper, middle, lower, price}'
+                'period': {'type': 'integer', 'default': 20},
+                'std_dev': {'type': 'number', 'default': 2},
+                'limit': {'type': 'integer', 'default': 200}
+            }
         }

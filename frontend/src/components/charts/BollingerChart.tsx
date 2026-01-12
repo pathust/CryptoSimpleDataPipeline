@@ -1,150 +1,174 @@
-/**
- * Bollinger Bands chart component.
- */
-
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import {
+  ComposedChart,
+  Line,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  TooltipProps,
+} from 'recharts';
 import { ChartProps } from '@/types/charts';
+import { formatChartTime } from '@/utils/timeFormat';
+
+// Cấu hình màu (Giữ nguyên theme tối)
+const THEME = {
+  bg: '#161A25',
+  grid: '#2B2F36',
+  textMain: '#EAECEF',
+  textSub: '#848E9C',
+  brand: '#F0B90B',
+  purple: '#B966F2',
+};
 
 interface BollingerDataPoint {
-    time: string;
-    upper: number;
-    middle: number;
-    lower: number;
-    price: number;
+  time: string;
+  upper: number;
+  middle: number;
+  lower: number;
+  price: number;
 }
 
-export function BollingerChart({ data }: ChartProps) {
-    if (!data || !Array.isArray(data) || data.length === 0) {
-        return (
-            <div className="flex items-center justify-center h-64 text-muted-foreground">
-                No Bollinger Bands data available
-            </div>
-        );
-    }
-
-    // Transform data for Recharts
-    const chartData = data.map((item: BollingerDataPoint) => ({
-        time: new Date(item.time).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        upper: item.upper,
-        middle: item.middle,
-        lower: item.lower,
-        price: item.price,
-    }));
-
+// 1. Component Tooltip Tùy Chỉnh
+// ------------------------------------------------------------------
+const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+  if (active && payload && payload.length) {
     return (
-        <div className="space-y-2">
-            <ResponsiveContainer width="100%" height={250}>
-                <AreaChart data={chartData}>
-                    <defs>
-                        <linearGradient id="bandGradient" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
-                            <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0.05} />
-                        </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                    <XAxis
-                        dataKey="time"
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                    />
-                    <YAxis
-                        stroke="hsl(var(--muted-foreground))"
-                        fontSize={12}
-                        tickLine={false}
-                        axisLine={false}
-                        tickFormatter={(value) => value.toFixed(2)}
-                    />
-                    <Tooltip
-                        contentStyle={{
-                            backgroundColor: 'hsl(var(--popover))',
-                            border: '1px solid hsl(var(--border))',
-                            borderRadius: '8px',
-                        }}
-                        labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
-                        formatter={(value: number, name: string) => {
-                            const labels: Record<string, string> = {
-                                upper: 'Upper Band',
-                                middle: 'Middle Band (SMA)',
-                                lower: 'Lower Band',
-                                price: 'Price',
-                            };
-                            return [value.toFixed(6), labels[name] || name];
-                        }}
-                    />
+      <div className="bg-[#1E2329] border border-[#474D57] rounded p-3 shadow-xl text-xs min-w-[160px]">
+        {/* Dòng hiển thị Thời gian */}
+        <p className="text-[#848E9C] mb-2 font-medium">{label}</p>
 
-                    {/* Band area */}
-                    <Area
-                        type="monotone"
-                        dataKey="upper"
-                        stroke="none"
-                        fill="url(#bandGradient)"
-                        fillOpacity={1}
-                    />
-                    <Area
-                        type="monotone"
-                        dataKey="lower"
-                        stroke="none"
-                        fill="hsl(var(--background))"
-                        fillOpacity={1}
-                    />
+        {/* Danh sách các chỉ số */}
+        <div className="space-y-1.5">
+          {payload.map((entry, index) => {
+            // Mapping tên dataKey sang Label hiển thị đẹp hơn
+            let displayName = entry.name;
+            let displayColor = entry.color;
+            
+            if (entry.dataKey === 'price') {
+              displayName = 'Price';
+              displayColor = THEME.textMain;
+            } else if (entry.dataKey === 'upper') {
+              displayName = 'Upper Band';
+              displayColor = THEME.brand;
+            } else if (entry.dataKey === 'lower') {
+              displayName = 'Lower Band';
+              displayColor = THEME.brand;
+            } else if (entry.dataKey === 'middle') {
+              displayName = 'SMA (20)';
+              displayColor = THEME.purple;
+            }
 
-                    {/* Upper band */}
-                    <Line
-                        type="monotone"
-                        dataKey="upper"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={1.5}
-                        dot={false}
-                        strokeDasharray="5 5"
-                    />
-
-                    {/* Middle band (SMA) */}
-                    < Line
-                        type="monotone"
-                        dataKey="middle"
-                        stroke="hsl(var(--muted-foreground))"
-                        strokeWidth={2}
-                        dot={false}
-                    />
-
-                    {/* Lower band */}
-                    <Line
-                        type="monotone"
-                        dataKey="lower"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={1.5}
-                        dot={false}
-                        strokeDasharray="5 5"
-                    />
-
-                    {/* Price */}
-                    <Line
-                        type="monotone"
-                        dataKey="price"
-                        stroke="hsl(var(--chart-2))"
-                        strokeWidth={2}
-                        dot={false}
-                    />
-                </AreaChart>
-            </ResponsiveContainer>
-
-            {/* Legend */}
-            <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-0.5 border-t-2 border-dashed border-primary" />
-                    <span>Bands</span>
+            return (
+              <div key={index} className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-2">
+                  {/* Dấu chấm màu định danh */}
+                  <div 
+                    className="w-1.5 h-1.5 rounded-full" 
+                    style={{ backgroundColor: displayColor }}
+                  />
+                  <span style={{ color: '#848E9C' }}>{displayName}</span>
                 </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-0.5 bg-muted-foreground" />
-                    <span>SMA</span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <div className="w-3 h-0.5 bg-chart-2" />
-                    <span>Price</span>
-                </div>
-            </div>
+                <span 
+                  className="font-mono font-medium" 
+                  style={{ color: displayColor }}
+                >
+                  {entry.value?.toFixed(2)}
+                </span>
+              </div>
+            );
+          })}
         </div>
+      </div>
     );
+  }
+  return null;
+};
+
+// 2. Chart Component Chính
+// ------------------------------------------------------------------
+export function BollingerChart({ data }: ChartProps) {
+  if (!data || !Array.isArray(data) || data.length === 0) {
+    return (
+      <div className="flex items-center justify-center h-[300px] bg-[#161A25] text-[#848E9C] border border-[#2B2F36] rounded-lg">
+        No Bollinger Bands data available
+      </div>
+    );
+  }
+
+  // Format time to match candlestick chart (lightweight-charts)
+  const chartData = data.map((item: BollingerDataPoint) => ({
+    time: formatChartTime(item.time), // HH:MM format, matches candlestick chart
+    upper: item.upper,
+    middle: item.middle,
+    lower: item.lower,
+    price: item.price,
+  }));
+
+  const allValues = data.flatMap((d) => [d.upper, d.lower, d.price]);
+  const minVal = Math.min(...allValues);
+  const maxVal = Math.max(...allValues);
+  const domainPadding = (maxVal - minVal) * 0.1;
+
+  return (
+    <div className="w-full bg-[#161A25] rounded-lg border border-[#2B2F36] p-4">
+       <div className="flex items-center gap-2 mb-4 text-xs font-medium">
+        <span style={{ color: THEME.textMain }}>Bollinger Bands (20, 2)</span>
+      </div>
+
+      <ResponsiveContainer width="100%" height={300}>
+        <ComposedChart data={chartData}>
+          <defs>
+            <linearGradient id="bandGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor={THEME.brand} stopOpacity={0.2} />
+              <stop offset="95%" stopColor={THEME.brand} stopOpacity={0.05} />
+            </linearGradient>
+          </defs>
+
+          <CartesianGrid strokeDasharray="3 3" stroke={THEME.grid} vertical={false} />
+
+          <XAxis
+            dataKey="time"
+            tickLine={false}
+            axisLine={false}
+            minTickGap={30}
+            tick={{ fill: THEME.textSub, fontSize: 11 }}
+            dy={10}
+          />
+
+          <YAxis
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(value) => value.toFixed(2)}
+            domain={[minVal - domainPadding, maxVal + domainPadding]}
+            orientation="right"
+            tick={{ fill: THEME.textSub, fontSize: 11 }}
+            width={50}
+          />
+
+          {/* SỬ DỤNG CUSTOM TOOLTIP TẠI ĐÂY */}
+          <Tooltip 
+            content={<CustomTooltip />} 
+            cursor={{ stroke: THEME.textSub, strokeDasharray: '3 3', strokeOpacity: 0.5 }}
+          />
+
+          {/* Các thành phần vẽ biểu đồ (Layers) */}
+          {/* Lớp nền Gradient */}
+          <Area type="monotone" dataKey="upper" stroke="none" fill="url(#bandGradient)" animationDuration={300} />
+          
+          {/* Lớp che (Mask) để tạo vùng giữa Upper và Lower */}
+          <Area type="monotone" dataKey="lower" stroke="none" fill={THEME.bg} fillOpacity={1} animationDuration={300} />
+
+          {/* Các đường chỉ báo */}
+          <Line type="monotone" dataKey="upper" stroke={THEME.brand} strokeWidth={1} dot={false} strokeOpacity={0.5} strokeDasharray="3 3" animationDuration={300} />
+          <Line type="monotone" dataKey="lower" stroke={THEME.brand} strokeWidth={1} dot={false} strokeOpacity={0.5} strokeDasharray="3 3" animationDuration={300} />
+          <Line type="monotone" dataKey="middle" stroke={THEME.purple} strokeWidth={1.5} dot={false} strokeOpacity={0.8} animationDuration={300} />
+          
+          {/* Đường giá (Vẽ cuối cùng để đè lên trên) */}
+          <Line type="monotone" dataKey="price" stroke={THEME.textMain} strokeWidth={2} dot={false} isAnimationActive={false} />
+        </ComposedChart>
+      </ResponsiveContainer>
+    </div>
+  );
 }

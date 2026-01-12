@@ -12,14 +12,12 @@ class VolumeProvider(DataProvider):
     def get_data(self, symbol: str, **params):
         """
         Get volume data over time.
-        
         Args:
             symbol: Trading pair symbol
             limit: Number of data points (default: 200)
             interval: Time interval (default: '1m')
-            
         Returns:
-            List of volume data points with time and volume
+            List of volume data points with time, volume, close_price, open_price
         """
         limit = params.get('limit', 200)
         interval = params.get('interval', '1m')
@@ -27,10 +25,12 @@ class VolumeProvider(DataProvider):
         try:
             conn = self._get_connection()
             
+            # CẬP NHẬT: Lấy thêm open_price để so sánh với close_price
             query = """
             SELECT 
                 open_time,
                 volume,
+                open_price,
                 close_price
             FROM fact_klines
             WHERE symbol = %s AND interval_code = %s
@@ -54,7 +54,8 @@ class VolumeProvider(DataProvider):
                 volume_data.append({
                     'time': open_time_utc,
                     'volume': float(row['volume']) if pd.notna(row['volume']) else 0,
-                    'price': float(row['close_price']) if pd.notna(row['close_price']) else 0
+                    'price': float(row['close_price']) if pd.notna(row['close_price']) else 0,
+                    'open': float(row['open_price']) if pd.notna(row['open_price']) else 0 # Thêm trường open
                 })
             
             return volume_data
@@ -69,16 +70,7 @@ class VolumeProvider(DataProvider):
             'name': 'Volume',
             'description': 'Trading volume over time',
             'parameters': {
-                'limit': {
-                    'type': 'integer',
-                    'default': 200,
-                    'description': 'Number of data points'
-                },
-                'interval': {
-                    'type': 'string',
-                    'default': '1m',
-                    'description': 'Time interval'
-                }
-            },
-            'data_format': 'Array of {time, volume, price}'
+                'limit': {'type': 'integer', 'default': 200},
+                'interval': {'type': 'string', 'default': '1m'}
+            }
         }
