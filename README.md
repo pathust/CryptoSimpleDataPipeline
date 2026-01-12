@@ -14,10 +14,11 @@ A professional-grade cryptocurrency data pipeline and analytics platform with in
 - **Interactive Charts**: Professional candlestick charts with zoom/pan
 
 ### 🧠 Intelligent Data Management
+- **MinIO Data Lake**: S3-compatible object storage for scalable data management
 - **Incremental Extraction**: Fetches only new data to optimize API calls
 - **Duplicate Prevention**: Automatic deduplication in database
-- **Auto-archiving**: Old files automatically moved to archive (7+ days)
-- **Auto-cleanup**: Archived files deleted after 30 days
+- **Auto-archiving**: Old data automatically moved to archive bucket (7+ days)
+- **Auto-cleanup**: Archived data deleted after 30 days
 - **Data Aggregation**: Pre-calculated hourly and daily summaries
 
 ### ⏰ Configurable Scheduler
@@ -132,10 +133,14 @@ python run_frontend.py
 
 ```
 CryptoSimpleDataPipeline/
-├── frontend/                 # Web UI (Port 8000)
-│   ├── index.html           # Multi-tab dashboard (Tailwind CSS)
-│   ├── style.css            # Custom minimal styles
-│   └── app.js               # Frontend logic & API calls
+├── frontend/                 # Web UI (Port 8000 - React/TypeScript)
+│   ├── src/
+│   │   ├── pages/           # Page components (Dashboard, Analytics, etc.)
+│   │   ├── components/      # Reusable components (charts, UI)
+│   │   ├── hooks/           # Custom React hooks
+│   │   └── config/          # Frontend configuration
+│   ├── index.html           # HTML template
+│   └── vite.config.ts       # Vite build configuration
 ├── src/
 │   ├── config.py            # Configuration (environment variables)
 │   ├── scheduler_config.py  # Runtime scheduler settings
@@ -144,25 +149,28 @@ CryptoSimpleDataPipeline/
 │   │   │   └── manager.py   # ExtractionManager
 │   │   ├── transform/       # Data transformation & loading
 │   │   │   └── manager.py   # TransformManager
+│   │   ├── analytics/       # Advanced analytics (NEW)
+│   │   │   ├── service.py   # AnalyticsService
+│   │   │   └── data_providers/ # Extensible provider registry
 │   │   ├── visualize/       # Data service & API
 │   │   │   └── service.py   # VisualizeService
 │   │   ├── stats/           # Technical indicators
 │   │   │   └── calculator.py # StatsCalculator
-│   │   ├── datalake/        # MinIO storage management
-│   │   │   ├── manager.py   # DataLakeManager
-│   │   │   └── minio_client.py # MinIO client wrapper
+│   │   ├── datalake/        # MinIO storage management (PRIMARY)
+│   │   │   ├── minio_client.py # MinIO S3-compatible client
+│   │   │   └── manager.py   # DataLakeManager
 │   │   └── warehouse/       # Data aggregation
 │   │       └── aggregator.py # WarehouseAggregator
 │   └── web/
 │       └── app.py           # Flask backend (Port 5001)
-├── data_lake/               # Local backup (optional, MinIO preferred)
-│   ├── raw/                 # Raw JSON files (by date)
-│   └── archive/             # Archived files (7+ days)
-├── minio_data/              # MinIO storage volumes (Docker)
+├── minio_data/              # MinIO storage volumes (Docker - PRIMARY STORAGE)
 │   ├── crypto-raw/          # Active data bucket
 │   └── crypto-archive/      # Archived data bucket
-├── docker-compose.yml       # MinIO service
-├── migrate_to_minio.py      # Migration utility
+├── data_lake/               # Legacy local files (DEPRECATED - use MinIO)
+│   ├── raw/                 # Old raw JSON files
+│   └── archive/             # Old archived files
+├── docker-compose.yml       # MinIO service definition
+├── migrate_to_minio.py      # Migration utility (file → MinIO)
 ├── run_backend.py           # Backend launcher
 ├── run_frontend.py          # Frontend launcher
 ├── rebuild_database.py      # Database reset utility
@@ -188,9 +196,9 @@ Configure via Scheduler tab or edit `scheduler_config.json`:
 
 ### Data Retention
 Modify in source files:
-- File archive: 7 days (configurable in `DataLakeManager`)
-- Archive cleanup: 30 days
-- Raw data cleanup: 90 days
+- MinIO archive: 7 days (files moved from `crypto-raw` to `crypto-archive` bucket)
+- Archive cleanup: 30 days (files deleted from `crypto-archive` bucket)
+- Database raw data cleanup: 90 days (fact tables in MySQL)
 
 ## 📡 API Endpoints
 

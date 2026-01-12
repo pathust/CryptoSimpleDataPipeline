@@ -43,10 +43,20 @@ src/
 │   ├── visualize/
 │   │   └── service.py          # VisualizeService
 │   ├── analytics/
-│   │   └── service.py          # AnalyticsService
+│   │   ├── service.py          # AnalyticsService
+│   │   └── data_providers/     # Extensible provider registry (NEW)
+│   │       ├── base.py         # BaseDataProvider
+│   │       ├── registry.py     # DataProviderRegistry
+│   │       ├── candlestick.py  # Candlestick data provider
+│   │       ├── volume.py       # Volume data provider
+│   │       ├── rsi.py          # RSI indicator
+│   │       ├── macd.py         # MACD indicator
+│   │       ├── bollinger.py    # Bollinger Bands
+│   │       └── ...             # More providers
 │   ├── stats/
 │   │   └── calculator.py       # StatsCalculator
 │   └── datalake/
+│       ├── minio_client.py     # MinIO S3-compatible client (NEW)
 │       └── manager.py          # DataLakeManager
 └── web/
     └── app.py                  # Flask application

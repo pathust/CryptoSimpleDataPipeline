@@ -121,29 +121,76 @@ flowchart TB
 
 ### 2. Data Lake Layer
 
+#### MinioClient
+**Location**: `src/modules/datalake/minio_client.py`
+
+**Responsibilities**:
+- Provide S3-compatible object storage interface
+- Manage MinIO buckets (`crypto-raw`, `crypto-archive`)
+- Upload/download data objects
+- Move objects between buckets (archiving)
+- List and delete objects
+
+**Key Features**:
+- **S3-Compatible**: Uses MinIO Python SDK for S3-compatible operations
+- **Bucket Management**: Auto-creates buckets if they don't exist
+- **Direct Upload**: Upload data directly to MinIO without temporary files
+- **Object Operations**: Full CRUD operations on MinIO objects
+
+**Key Methods**:
+- `upload_data(data, object_name, bucket)` - Upload data directly to MinIO
+- `upload_file(file_path, object_name, bucket)` - Upload from local file
+- `get_object_content(object_name, bucket)` - Get object as string
+- `list_objects(prefix, bucket)` - List objects with prefix filter
+- `move_object(src_object, dst_object, src_bucket, dst_bucket)` - Move between buckets
+- `delete_object(object_name, bucket)` - Delete an object
+- `object_exists(object_name, bucket)` - Check if object exists
+
+**MinIO Configuration** (`src/config.py`):
+```python
+MINIO_ENDPOINT = 'localhost:9000'
+MINIO_ACCESS_KEY = 'minioadmin'
+MINIO_SECRET_KEY = 'minioadmin123'
+MINIO_BUCKET_RAW = 'crypto-raw'      # Active data
+MINIO_BUCKET_ARCHIVE = 'crypto-archive'  # Archived data
+MINIO_SECURE = False  # Use HTTPS (production: True)
+```
+
 #### DataLakeManager
 **Location**: `src/modules/datalake/manager.py`
 
 **Responsibilities**:
-- Track all files in the data lake
-- Archive files older than 7 days
-- Clean up archived files older than 30 days
+- Track processed files in database
+- Archive objects older than 7 days (move from `crypto-raw` to `crypto-archive` bucket)
+- Clean up archived objects older than 30 days (delete from `crypto-archive`)
 - Provide statistics about data lake storage
 
-**File Organization**:
+**Storage Organization**:
 ```
-data_lake/
-├── raw/
+MinIO Buckets:
+├── crypto-raw/           # Active data (0-7 days)
 │   ├── 2026-01-09/
 │   │   ├── BTCUSDT_klines_1736428800000.json
 │   │   ├── BTCUSDT_depth_1736428800123.json
 │   │   └── ...
-│   └── 2026-01-10/
-│       └── ...
-└── archive/
-    ├── 2025-12-20/
+│   ├── 2026-01-10/
+│   └── ...
+└── crypto-archive/       # Archived data (7-30 days)
+    ├── 2026-01-01/
     └── ...
+
+Local Files (DEPRECATED):
+data_lake/
+├── raw/                  # Legacy local storage
+└── archive/              # Legacy archived files
 ```
+
+**Key Methods**:
+- `mark_file_processed(file_path, symbol, data_type, record_count)` - Track in database
+- `is_file_processed(file_path)` - Check if already processed
+- `archive_old_files(days_old=7)` - Move to archive bucket
+- `cleanup_old_archives(days_old=30)` - Delete old archives
+- `get_statistics()` - Get file counts and storage type
 
 ---
 
@@ -232,10 +279,45 @@ data_lake/
 - Provide candlestick data for React charts
 - Provide orderbook snapshots
 - Advanced market analytics
+- Manage data provider registry
 
 **Key Methods**:
 - `get_candlestick_data(symbol, limit, interval)` - Get OHLCV data
 - `get_orderbook_snapshot(symbol, limit)` - Get latest orderbook
+
+**Data Provider System**:
+
+**NEW**: The analytics module now includes an extensible data provider registry system that makes it easy to add new analytics without changing the core API.
+
+**Provider Registry** (`src/modules/analytics/data_providers/registry.py`):
+- Centralized registry for all data providers
+- Automatic discovery and metadata generation
+- Consistent API interface for all providers
+
+**Available Providers** (`src/modules/analytics/data_providers/`):
+- **candlestick.py**: OHLCV candlestick data
+- **volume.py**: Trading volume over time
+- **rsi.py**: Relative Strength Index (RSI) indicator
+- **macd.py**: Moving Average Convergence Divergence
+- **bollinger.py**: Bollinger Bands volatility indicator
+- **orderbook.py**: Market depth snapshots
+- **atr.py**: Average True Range volatility
+- **correlation.py**: Asset correlation analysis
+- **price_distribution.py**: Price distribution analysis
+- **return_distribution.py**: Return distribution statistics
+- **volume_profile.py**: Volume by price level
+
+**Generic API Endpoint**:
+```
+GET /api/analytics/data/{provider}/{symbol}?param1=value1&param2=value2
+```
+
+Examples:
+- `/api/analytics/data/candlestick/BTCUSDT?limit=200`
+- `/api/analytics/data/rsi/BTCUSDT?period=14&limit=200`
+- `/api/analytics/data/macd/BTCUSDT?fast_period=12&slow_period=26`
+
+**Adding New Providers**: Simply create a new provider class inheriting from `BaseDataProvider` and it will be automatically registered and accessible via the API.
 
 #### StatsCalculator
 **Location**: `src/modules/stats/calculator.py`

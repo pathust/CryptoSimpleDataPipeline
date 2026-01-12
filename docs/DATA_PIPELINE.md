@@ -223,20 +223,28 @@ Examples:
 
 ---
 
-## Stage 3: Data Lake (File Storage)
+## Stage 3: Data Lake (MinIO Storage)
 
 ### Overview
 
-The data lake is a file-based storage layer that holds raw JSON data before transformation. It provides:
-- **Immutable raw data** for audit and reprocessing
-- **Time-series organization** for easy access
-- **Automatic archiving** to manage storage
+The data lake is **MinIO-based object storage** that holds raw JSON data before transformation. MinIO provides S3-compatible storage with the following benefits:
+- **Scalability**: Handles large volumes of data efficiently
+- **Durability**: Data replication and high availability
+- **S3-Compatible API**: Industry-standard interface
+- **Performance**: High-throughput reads and writes
+- **Cost-Effective**: Self-hosted alternative to cloud storage
 
-### Directory Structure
+**Purpose**:
+- **Immutable raw data** for audit and reprocessing
+- **Time-series organization** for easy access by date
+- **Automatic archiving** to manage storage costs
+- **Decoupled storage** from compute layer
+
+### MinIO Bucket Structure
 
 ```
-data_lake/
-├── raw/                          # Active files (0-7 days old)
+MinIO Server (localhost:9000)
+├── crypto-raw/                  # Active data bucket (0-7 days)
 │   ├── 2026-01-09/
 │   │   ├── BTCUSDT_klines_1736428800123.json
 │   │   ├── BTCUSDT_depth_1736428800456.json
@@ -244,16 +252,66 @@ data_lake/
 │   │   └── ...
 │   ├── 2026-01-10/
 │   │   └── ...
-│   └── 2026-01-15/
+│   └── 2026-01-13/
 │       └── ...
-└── archive/                      # Archived files (7-30 days old)
-    ├── 2025-12-20/
+└── crypto-archive/              # Archived data bucket (7-30 days)
+    ├── 2026-01-01/
     │   └── ...
-    └── 2026-01-01/
+    └── 2026-01-05/
         └── ...
+
+Legacy (DEPRECATED):
+data_lake/                       # Local file storage (deprecated)
+├── raw/
+└── archive/
 ```
 
+**Object Naming Convention**:
+```
+{date}/{symbol}_{data_type}_{timestamp_ms}.json
+```
+
+Examples:
+- `2026-01-09/BTCUSDT_klines_1736428800123.json`
+- `2026-01-09/ETHUSDT_depth_1736428800456.json`
+
+### MinIO Configuration
+
+**docker-compose.yml**:
+```yaml
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: crypto_pipeline_minio
+    ports:
+      - "9000:9000"  # MinIO API
+      - "9001:9001"  # MinIO Console UI
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin123
+    volumes:
+      - ./minio_data:/data
+    command: server /data --console-address ":9001"
+    restart: unless-stopped
+```
+
+**Application Configuration**  (`src/config.py`):
+```python
+MINIO_ENDPOINT = 'localhost:9000'
+MINIO_ACCESS_KEY = 'minioadmin'
+MINIO_SECRET_KEY = 'minioadmin123'
+MINIO_BUCKET_RAW = 'crypto-raw'
+MINIO_BUCKET_ARCHIVE = 'crypto-archive'
+MINIO_SECURE = False  # Set to True for HTTPS in production
+```
+
+**Access MinIO Console**: http://localhost:9001
+- Username: `minioadmin`
+- Password: `minioadmin123`
+
 ### JSON File Format
+
+The JSON format remains the same regardless of storage backend.
 
 #### K-lines File
 ```json
@@ -301,31 +359,125 @@ data_lake/
 }
 ```
 
+### Storage Operations
+
+#### Upload to MinIO
+
+**ExtractionManager** uses `MinioClient` to upload data:
+
+```python
+# Save data directly to MinIO
+object_name = f"{today}/{symbol}_{data_type}_{timestamp}.json"
+json_data = json.dumps(payload)
+
+if not self.minio_client.upload_data(
+    json_data,
+    object_name,
+    bucket=self.minio_client.bucket_raw
+):
+    raise Exception(f"Failed to upload to MinIO: {object_name}")
+```
+
+**Key Features**:
+- Direct upload without temporary files
+- Automatic bucket creation
+- Error handling with exceptions
+- Returns object path for tracking
+
+#### Read from MinIO
+
+**TransformManager** reads files from MinIO:
+
+```python
+# List today's objects
+objects = self.datalake_mgr.minio_client.list_objects(
+    prefix=f"{today}/",
+    bucket=self.datalake_mgr.minio_client.bucket_raw
+)
+
+# Get object content
+for object_name in objects:
+    content = self.datalake_mgr.minio_client.get_object_content(
+        object_name,
+        bucket=self.datalake_mgr.minio_client.bucket_raw
+    )
+    data = json.loads(content)
+    # Process data...
+```
+
 ### Archiving & Cleanup
 
 #### Archiving (7 days)
 ```mermaid
 flowchart LR
-    Raw["raw/2026-01-01/"] -->|"7 days old"| Archive["archive/2026-01-01/"]
+    Raw["crypto-raw bucket<br/>2026-01-01/"] -->|"7 days old"| Archive["crypto-archive bucket<br/>2026-01-01/"]
 ```
 
 **Process**:
 1. Weekly maintenance job triggered
 2. `DataLakeManager.archive_old_files(days=7)`
-3. Move entire date folders from `raw/` to `archive/`
-4. Update `file_metadata` table
+3. Query database for files older than 7 days
+4. **Move objects** from `crypto-raw` to `crypto-archive` bucket using MinIO API
+5. Update `processed_files` table with new location and `archived=TRUE`
+
+**Code**:
+```python
+# Move object between buckets
+if self.minio_client.move_object(
+    object_name,
+    object_name,  # Same name in archive
+    src_bucket=self.minio_client.bucket_raw,
+    dst_bucket=self.minio_client.bucket_archive
+):
+    # Update database
+    cursor.execute("""
+        UPDATE processed_files 
+        SET archived = TRUE, file_path = %s 
+        WHERE file_path = %s
+    """, (new_path, file_path))
+```
 
 #### Cleanup (30 days)
 ```mermaid
 flowchart LR
-    Archive["archive/2025-12-01/"] -->|"30 days old"| Delete["🗑️ Deleted"]
+    Archive["crypto-archive bucket<br/>2025-12-01/"] -->|"30 days old"| Delete["🗑️ Deleted"]
 ```
 
 **Process**:
 1. Weekly maintenance job triggered
 2. `DataLakeManager.cleanup_old_archives(days=30)`
-3. Delete entire date folders from `archive/`
-4. Permanent deletion (no recovery)
+3. Query database for archived files older than 30 days
+4. **Delete objects** from `crypto-archive` bucket using MinIO API
+5. Delete records from `processed_files` table
+6. Permanent deletion (no recovery)
+
+**Code**:
+```python
+# Delete from archive bucket
+if self.minio_client.delete_object(
+    object_name,
+    bucket=self.minio_client.bucket_archive
+):
+    # Remove from database
+    cursor.execute(
+        "DELETE FROM processed_files WHERE file_path = %s",
+        (file_path,)
+    )
+```
+
+### MinIO vs Local Files
+
+| Feature | MinIO (Current) | Local Files (Deprecated) |
+|---------|----------------|---------------------------|
+| **Scalability** | Excellent - handles TB of data | Limited by disk space |
+| **Durability** | High - erasure coding support | Single point of failure |
+| **Access Method** | S3 API over network | File system operations |
+| **Backup** | Built-in replication | Manual file copying |
+| **Cloud-Ready** | Yes - S3 compatible | Requires custom migration |
+| **Console UI** | Yes - web browser at :9001 | No - command line only |
+| **Multi-Server** | Yes - distributed mode | No - single machine |
+
+**Migration**: The `migrate_to_minio.py` script can migrate existing local files to MinIO.
 
 ---
 
