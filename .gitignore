@@ -47,6 +47,7 @@ data_lake/archive/*
 !data_lake/archive/.gitkeep
 vis_output/
 *.csv
+minio_data/
 
 # Logs
 *.log

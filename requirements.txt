@@ -7,3 +7,4 @@ python-dotenv
 flask
 apscheduler
 flask-cors
+minio

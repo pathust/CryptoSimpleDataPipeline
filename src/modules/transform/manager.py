@@ -6,6 +6,10 @@ import src.config as config
 import glob
 from src.modules.datalake.manager import DataLakeManager
 from src.modules.warehouse.aggregator import WarehouseAggregator
+import tempfile
+import logging
+
+logger = logging.getLogger(__name__)
 
 class TransformManager:
     def __init__(self):
@@ -21,10 +25,18 @@ class TransformManager:
         )
 
     def process_file(self, filepath, force_process=False):
+        """
+        Process a file from MinIO storage.
+        
+        Args:
+            filepath: MinIO object name
+            force_process: Force processing even if already processed
+        """
         # Check if already processed (unless forced)
         if not force_process and self.datalake_mgr.is_file_processed(filepath):
             return 0  # Silently skip without logging
         
+        temp_file = None
         try:
             conn = self.get_db_connection()
             conn.autocommit = False
@@ -34,11 +46,27 @@ class TransformManager:
             data_type = None
             count = 0
             
+            # Download from MinIO to temporary file
+            temp_file = tempfile.NamedTemporaryFile(mode='w+', suffix='.json', delete=False)
+            temp_path = temp_file.name
+            temp_file.close()
+            
+            if not self.datalake_mgr.minio_client.download_file(
+                filepath,
+                temp_path,
+                bucket=self.datalake_mgr.minio_client.bucket_raw
+            ):
+                logger.error(f"Failed to download from MinIO: {filepath}")
+                return 0
+            
+            process_path = temp_path
+            
+            # Process the file
             if "klines" in filepath:
-                symbol, count = self._process_klines(filepath, cursor)
+                symbol, count = self._process_klines(process_path, cursor)
                 data_type = "klines"
             elif "depth" in filepath:
-                symbol, count = self._process_depth(filepath, cursor)
+                symbol, count = self._process_depth(process_path, cursor)
                 data_type = "depth"
             
             conn.commit()
@@ -51,8 +79,15 @@ class TransformManager:
             
             return count
         except Exception as e:
-            print(f"Error processing {filepath}: {e}")
+            logger.error(f"Error processing {filepath}: {e}")
             return 0
+        finally:
+            # Cleanup temporary file
+            if temp_file and os.path.exists(temp_file.name):
+                try:
+                    os.unlink(temp_file.name)
+                except Exception as e:
+                    logger.warning(f"Failed to cleanup temp file: {e}")
 
     def _process_klines(self, filepath,cursor):
         with open(filepath, 'r') as f:
@@ -120,10 +155,15 @@ class TransformManager:
         return symbol, len(values)
 
     def process_recent_files(self):
-        """Process files from today's folder."""
+        """Process files from today's folder in MinIO."""
         today = datetime.now().strftime("%Y-%m-%d")
-        search_path = os.path.join(config.RAW_DATA_DIR, today, "*.json")
-        files = glob.glob(search_path)
+        
+        # List objects from MinIO with today's prefix
+        prefix = f"{today}/"
+        files = self.datalake_mgr.minio_client.list_objects(
+            prefix=prefix,
+            bucket=self.datalake_mgr.minio_client.bucket_raw
+        )
         
         total_records = 0
         processed_count = 0
@@ -229,9 +269,9 @@ class TransformManager:
                         )
                         
                         if klines and len(klines) > 0:
-                            filepath = extractor.save_to_datalake(klines, symbol, "klines")
-                            if filepath:
-                                self.process_file(filepath)
+                            object_path = extractor.save_to_datalake(klines, symbol, "klines")
+                            if object_path:
+                                self.process_file(object_path)
                                 print(f"   ✅ Refetched and fixed {len(klines)} records")
                 
                 # Check for flat candles (open = close) - potential data quality issue
@@ -271,10 +311,10 @@ class TransformManager:
                         )
                         
                         if klines and len(klines) > 0:
-                            filepath = extractor.save_to_datalake(klines, symbol, "klines")
-                            if filepath:
+                            object_path = extractor.save_to_datalake(klines, symbol, "klines")
+                            if object_path:
                                 # Force process to bypass duplicate check
-                                self.process_file(filepath, force_process=True)
+                                self.process_file(object_path, force_process=True)
                                 print(f"   ✅ Refetched {len(klines)} records")
                 
                 # STEP 1: Check if we're missing recent data (latest DB → now)
@@ -304,12 +344,106 @@ class TransformManager:
                         )
                         
                         if klines and len(klines) > 0:
-                            filepath = extractor.save_to_datalake(klines, symbol, "klines")
-                            if filepath:
-                                self.process_file(filepath)
+                            object_path = extractor.save_to_datalake(klines, symbol, "klines")
+                            if object_path:
+                                self.process_file(object_path)
                                 print(f"   ✅ Filled {len(klines)} recent records")
                 
-                # STEP 2: Find gaps in historical data
+                # STEP 1.5: Detect completely missing time periods (entire days with no data)
+                # This handles cases where there are NO records at all in certain date ranges
+                cursor.execute("""
+                    SELECT MIN(open_time) as min_time, MAX(open_time) as max_time
+                    FROM fact_klines
+                    WHERE symbol = %s AND interval_code = '1m'
+                """, (symbol,))
+                
+                result = cursor.fetchone()
+                if result and result[0] and result[1]:
+                    min_time = result[0]
+                    max_time = result[1]
+                    
+                    # Check for large gaps (>60 minutes) that might indicate missing days
+                    cursor.execute("""
+                        SELECT 
+                            DATE(t1.open_time) as date1,
+                            DATE(MIN(t2.open_time)) as date2,
+                            TIMESTAMPDIFF(HOUR, t1.open_time, MIN(t2.open_time)) as gap_hours
+                        FROM fact_klines t1
+                        LEFT JOIN fact_klines t2 
+                            ON t1.symbol = t2.symbol 
+                            AND t2.open_time > t1.open_time
+                        WHERE t1.symbol = %s
+                            AND t1.interval_code = '1m'
+                        GROUP BY t1.open_time
+                        HAVING gap_hours > 1
+                        ORDER BY t1.open_time
+                    """, (symbol,))
+                    
+                    large_gaps = cursor.fetchall()
+                    
+                    if large_gaps:
+                        print(f"\n🔍 {symbol}: Scanning for missing time periods...")
+                        for date1, date2, gap_hours in large_gaps:
+                            if gap_hours >= 24:  # Missing at least a day
+                                # Find the exact time range
+                                cursor.execute("""
+                                    SELECT open_time FROM fact_klines
+                                    WHERE symbol = %s AND interval_code = '1m'
+                                        AND DATE(open_time) = %s
+                                    ORDER BY open_time DESC LIMIT 1
+                                """, (symbol, date1))
+                                last_time_day1 = cursor.fetchone()
+                                
+                                cursor.execute("""
+                                    SELECT open_time FROM fact_klines
+                                    WHERE symbol = %s AND interval_code = '1m'
+                                        AND DATE(open_time) = %s
+                                    ORDER BY open_time ASC LIMIT 1
+                                """, (symbol, date2))
+                                first_time_day2 = cursor.fetchone()
+                                
+                                if last_time_day1 and first_time_day2:
+                                    gap_start_time = last_time_day1[0]
+                                    gap_end_time = first_time_day2[0]
+                                    gap_minutes = int((gap_end_time - gap_start_time).total_seconds() / 60)
+                                    
+                                    print(f"   📅 Found {gap_hours}h gap: {gap_start_time} → {gap_end_time}")
+                                    print(f"   ⚠️  Filling {gap_minutes} minutes in chunks...")
+                                    
+                                    # Fill in chunks
+                                    filled_total = 0
+                                    current_start = gap_start_time + timedelta(minutes=1)
+                                    
+                                    while current_start < gap_end_time:
+                                        minutes_remaining = int((gap_end_time - current_start).total_seconds() / 60)
+                                        chunk_size = min(minutes_remaining + 10, 1000)
+                                        
+                                        klines = extractor.fetch_klines(
+                                            symbol,
+                                            interval="1m",
+                                            limit=chunk_size,
+                                            start_time=current_start
+                                        )
+                                        
+                                        if klines and len(klines) > 0:
+                                            object_path = extractor.save_to_datalake(klines, symbol, "klines")
+                                            if object_path:
+                                                self.process_file(object_path)
+                                                filled_total += len(klines)
+                                                
+                                                # Move start time forward
+                                                last_candle_time = datetime.fromtimestamp(klines[-1][0] / 1000)
+                                                current_start = last_candle_time + timedelta(minutes=1)
+                                                
+                                                print(f"      Progress: {filled_total}/{gap_minutes} records", end='\r')
+                                        else:
+                                            break
+                                    
+                                    if filled_total > 0:
+                                        print(f"\n   ✅ Filled {filled_total} records across missing period")
+                
+                # STEP 2: Find gaps in historical data  
+                # Remove LIMIT to process ALL gaps, even large ones
                 cursor.execute("""
                     SELECT 
                         t1.open_time as gap_start,
@@ -324,7 +458,6 @@ class TransformManager:
                     GROUP BY t1.open_time
                     HAVING gap_minutes > 1
                     ORDER BY gap_start
-                    LIMIT 10
                 """, (symbol,))
                 
                 gaps = cursor.fetchall()
@@ -334,28 +467,56 @@ class TransformManager:
                 if gaps:
                     print(f"\n🔧 {symbol}: Found {len(gaps)} historical gap(s)")
                     for gap_start, gap_end, gap_minutes in gaps:
-                        if gap_minutes > 1000:
-                            print(f"   ⚠️  Gap too large ({gap_minutes}m), skipping: {gap_start} → {gap_end}")
-                            continue
-                        
                         print(f"   📥 Filling gap: {gap_start} → {gap_end} ({gap_minutes} minutes)")
                         
-                        # Fetch data to fill the gap
-                        start_time = gap_start + timedelta(minutes=1)
-                        klines = extractor.fetch_klines(
-                            symbol, 
-                            interval="1m", 
-                            limit=min(gap_minutes + 10, 1000),
-                            start_time=start_time
-                        )
-                        
-                        if klines and len(klines) > 0:
-                            # Save to datalake
-                            filepath = extractor.save_to_datalake(klines, symbol, "klines")
-                            if filepath:
-                                # Process immediately
-                                self.process_file(filepath)
-                                print(f"   ✅ Filled {len(klines)} records")
+                        # If gap is too large, break into chunks of 1000
+                        if gap_minutes > 1000:
+                            print(f"   ⚠️  Gap is large, splitting into {(gap_minutes // 1000) + 1} chunks")
+                            
+                            filled_total = 0
+                            current_start = gap_start + timedelta(minutes=1)
+                            
+                            while current_start < gap_end:
+                                # Calculate how many minutes to fetch (max 1000)
+                                minutes_remaining = int((gap_end - current_start).total_seconds() / 60)
+                                chunk_size = min(minutes_remaining + 10, 1000)
+                                
+                                klines = extractor.fetch_klines(
+                                    symbol,
+                                    interval="1m",
+                                    limit=chunk_size,
+                                    start_time=current_start
+                                )
+                                
+                                if klines and len(klines) > 0:
+                                    object_path = extractor.save_to_datalake(klines, symbol, "klines")
+                                    if object_path:
+                                        self.process_file(object_path)
+                                        filled_total += len(klines)
+                                        
+                                        # Move start time forward
+                                        last_candle_time = datetime.fromtimestamp(klines[-1][0] / 1000)
+                                        current_start = last_candle_time + timedelta(minutes=1)
+                                else:
+                                    break
+                            
+                            if filled_total > 0:
+                                print(f"   ✅ Filled {filled_total} records in multiple chunks")
+                        else:
+                            # Gap is small enough for single API call
+                            start_time = gap_start + timedelta(minutes=1)
+                            klines = extractor.fetch_klines(
+                                symbol,
+                                interval="1m",
+                                limit=min(gap_minutes + 10, 1000),
+                                start_time=start_time
+                            )
+                            
+                            if klines and len(klines) > 0:
+                                object_path = extractor.save_to_datalake(klines, symbol, "klines")
+                                if object_path:
+                                    self.process_file(object_path)
+                                    print(f"   ✅ Filled {len(klines)} records")
                 
                 if not gaps and not integrity_issues and latest_time:
                     minutes_since = int((datetime.now() - latest_time).total_seconds() / 60)

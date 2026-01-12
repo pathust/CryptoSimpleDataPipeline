@@ -28,3 +28,11 @@ FLASK_PORT = int(os.getenv('FLASK_PORT', '5001'))
 
 # Frontend Configuration
 FRONTEND_PORT = int(os.getenv('FRONTEND_PORT', '8000'))
+
+# MinIO Configuration (Data Lake)
+MINIO_ENDPOINT = os.getenv('MINIO_ENDPOINT', 'localhost:9000')
+MINIO_ACCESS_KEY = os.getenv('MINIO_ACCESS_KEY', 'minioadmin')
+MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', 'minioadmin123')
+MINIO_BUCKET_RAW = os.getenv('MINIO_BUCKET_RAW', 'crypto-raw')
+MINIO_BUCKET_ARCHIVE = os.getenv('MINIO_BUCKET_ARCHIVE', 'crypto-archive')
+MINIO_SECURE = os.getenv('MINIO_SECURE', 'False').lower() == 'true'

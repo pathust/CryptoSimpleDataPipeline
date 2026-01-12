@@ -3,12 +3,20 @@ import shutil
 from datetime import datetime, timedelta
 import mysql.connector
 import src.config as config
+from src.modules.datalake.minio_client import MinioClient
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DataLakeManager:
     def __init__(self):
-        self.raw_dir = config.RAW_DATA_DIR
+        self.raw_dir = config.RAW_DATA_DIR  # Keep for backward compatibility during migration
         self.archive_dir = os.path.join(config.DATA_LAKE_DIR, "archive")
         os.makedirs(self.archive_dir, exist_ok=True)
+        
+        # Initialize MinIO client - MANDATORY, no fallback
+        self.minio_client = MinioClient()
+        logger.info("DataLakeManager initialized with MinIO storage")
     
     def get_db_connection(self):
         return mysql.connector.connect(
@@ -19,7 +27,15 @@ class DataLakeManager:
         )
     
     def mark_file_processed(self, file_path, symbol, data_type, record_count):
-        """Mark a file as processed in the database."""
+        """
+        Mark a file as processed in the database.
+        
+        Args:
+            file_path: MinIO object name or local file path
+            symbol: Trading symbol
+            data_type: Type of data (klines or depth)
+            record_count: Number of records in file
+        """
         try:
             conn = self.get_db_connection()
             cursor = conn.cursor()
@@ -39,7 +55,7 @@ class DataLakeManager:
             conn.close()
             return True
         except Exception as e:
-            print(f"Error marking file as processed: {e}")
+            logger.error(f"Error marking file as processed: {e}")
             return False
     
     def is_file_processed(self, file_path):
@@ -53,11 +69,15 @@ class DataLakeManager:
             conn.close()
             return result is not None
         except Exception as e:
-            print(f"Error checking if file is processed: {e}")
+            logger.error(f"Error checking if file is processed: {e}")
             return False
     
     def archive_old_files(self, days_old=7):
-        """Archive processed files older than specified days."""
+        """
+        Archive processed files older than specified days.
+        For MinIO: moves objects from raw bucket to archive bucket.
+        For local: moves files to archive directory.
+        """
         cutoff_date = datetime.now() - timedelta(days=days_old)
         archived_count = 0
         
@@ -76,30 +96,31 @@ class DataLakeManager:
             
             for file_info in files_to_archive:
                 file_path = file_info['file_path']
-                if os.path.exists(file_path):
-                    # Extract date from path for organizing archive
-                    parts = file_path.split(os.sep)
-                    date_folder = None
-                    for part in parts:
-                        if '-' in part and len(part) == 10:  # YYYY-MM-DD format
-                            date_folder = part
-                            break
-                    
-                    if date_folder:
-                        archive_path = os.path.join(self.archive_dir, date_folder)
-                        os.makedirs(archive_path, exist_ok=True)
-                        
-                        dest_file = os.path.join(archive_path, file_info['file_name'])
-                        shutil.move(file_path, dest_file)
-                        
-                        # Mark as archived
-                        cursor.execute("""
-                            UPDATE processed_files 
-                            SET archived = TRUE, file_path = %s 
-                            WHERE file_path = %s
-                        """, (dest_file, file_path))
-                        
-                        archived_count += 1
+                file_name = file_info['file_name']
+                
+                # MinIO: move object from raw to archive bucket
+                # Extract date folder from file path or use current structure
+                parts = file_path.split('/')
+                if len(parts) > 1:
+                    object_name = '/'.join(parts[-2:])  # e.g., "2026-01-12/BTCUSDT_klines_123.json"
+                else:
+                    object_name = file_path
+                
+                # Move to archive bucket
+                if self.minio_client.move_object(
+                    object_name,
+                    object_name,
+                    src_bucket=self.minio_client.bucket_raw,
+                    dst_bucket=self.minio_client.bucket_archive
+                ):
+                    # Update database with new location
+                    new_path = f"archive/{object_name}"
+                    cursor.execute("""
+                        UPDATE processed_files 
+                        SET archived = TRUE, file_path = %s 
+                        WHERE file_path = %s
+                    """, (new_path, file_path))
+                    archived_count += 1
             
             conn.commit()
             cursor.close()
@@ -109,11 +130,15 @@ class DataLakeManager:
             return archived_count
             
         except Exception as e:
-            print(f"Error archiving files: {e}")
+            logger.error(f"Error archiving files: {e}")
             return 0
     
     def cleanup_old_archives(self, days_old=30):
-        """Delete archived files older than specified days."""
+        """
+        Delete archived files older than specified days.
+        For MinIO: deletes objects from archive bucket.
+        For local: deletes files from archive directory.
+        """
         cutoff_date = datetime.now() - timedelta(days=days_old)
         deleted_count = 0
         
@@ -132,8 +157,15 @@ class DataLakeManager:
             
             for file_info in files_to_delete:
                 file_path = file_info['file_path']
-                if os.path.exists(file_path):
-                    os.remove(file_path)
+                
+                # MinIO: delete from archive bucket
+                # Remove 'archive/' prefix if present
+                object_name = file_path.replace('archive/', '', 1)
+                
+                if self.minio_client.delete_object(
+                    object_name,
+                    bucket=self.minio_client.bucket_archive
+                ):
                     deleted_count += 1
                 
                 # Remove from database
@@ -147,7 +179,7 @@ class DataLakeManager:
             return deleted_count
             
         except Exception as e:
-            print(f"Error cleaning up archives: {e}")
+            logger.error(f"Error cleaning up archives: {e}")
             return 0
     
     def get_statistics(self):
@@ -156,24 +188,25 @@ class DataLakeManager:
             conn = self.get_db_connection()
             cursor = conn.cursor(dictionary=True)
             
-            cursor.execute("SELECT COUNT(*) as total FROM processed_files")
-            total = cursor.fetchone()['total']
+            # Count active and archived files
+            cursor.execute("SELECT COUNT(*) as count FROM processed_files WHERE archived = FALSE")
+            active_count = cursor.fetchone()['count']
             
-            cursor.execute("SELECT COUNT(*) as archived FROM processed_files WHERE archived = TRUE")
-            archived = cursor.fetchone()['archived']
-            
-            cursor.execute("SELECT SUM(record_count) as records FROM processed_files")
-            records = cursor.fetchone()['records'] or 0
+            cursor.execute("SELECT COUNT(*) as count FROM processed_files WHERE archived = TRUE")
+            archived_count = cursor.fetchone()['count']
             
             cursor.close()
             conn.close()
             
             return {
-                "total_files": total,
-                "archived_files": archived,
-                "active_files": total - archived,
-                "total_records": records
+                "active_files": active_count,
+                "archived_files": archived_count,
+                "storage_type": "MinIO"
             }
         except Exception as e:
-            print(f"Error getting statistics: {e}")
-            return {}
+            logger.error(f"Error getting statistics: {e}")
+            return {
+                "active_files": 0,
+                "archived_files": 0,
+                "storage_type": "MinIO"
+            }

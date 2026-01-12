@@ -54,6 +54,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 ### Prerequisites
 - Python 3.12+
 - MySQL 8.0+
+- Docker & Docker Compose (for MinIO)
 - Conda (recommended)
 
 ### Installation
@@ -96,11 +97,25 @@ SYMBOLS=BTCUSDT,ETHUSDT,BNBUSDT
 python rebuild_database.py
 ```
 
+6. **Start MinIO (Data Lake)**
+```bash
+docker-compose up -d
+```
+
+Access MinIO console at http://localhost:9001 (credentials: `minioadmin` / `minioadmin123`)
+
 ### Running the Application
 
-Open two terminal windows:
+Open three terminal windows:
 
-**Terminal 1 - Backend API**
+**Terminal 1 - MinIO (Data Lake)**
+```bash
+docker-compose up -d
+# Access MinIO Console: http://localhost:9001
+# Login: minioadmin / minioadmin123
+```
+
+**Terminal 2 - Backend API**
 ```bash
 conda activate crypto_data_pipeline_env
 python run_backend.py
@@ -133,15 +148,21 @@ CryptoSimpleDataPipeline/
 │   │   │   └── service.py   # VisualizeService
 │   │   ├── stats/           # Technical indicators
 │   │   │   └── calculator.py # StatsCalculator
-│   │   ├── datalake/        # File management
-│   │   │   └── manager.py   # DataLakeManager
+│   │   ├── datalake/        # MinIO storage management
+│   │   │   ├── manager.py   # DataLakeManager
+│   │   │   └── minio_client.py # MinIO client wrapper
 │   │   └── warehouse/       # Data aggregation
 │   │       └── aggregator.py # WarehouseAggregator
 │   └── web/
 │       └── app.py           # Flask backend (Port 5001)
-├── data_lake/
-│   ├── raw/                 # Active JSON files (by date)
+├── data_lake/               # Local backup (optional, MinIO preferred)
+│   ├── raw/                 # Raw JSON files (by date)
 │   └── archive/             # Archived files (7+ days)
+├── minio_data/              # MinIO storage volumes (Docker)
+│   ├── crypto-raw/          # Active data bucket
+│   └── crypto-archive/      # Archived data bucket
+├── docker-compose.yml       # MinIO service
+├── migrate_to_minio.py      # Migration utility
 ├── run_backend.py           # Backend launcher
 ├── run_frontend.py          # Frontend launcher
 ├── rebuild_database.py      # Database reset utility

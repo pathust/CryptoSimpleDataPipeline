@@ -5,10 +5,21 @@ import time
 from datetime import datetime, timedelta
 import src.config as config
 import mysql.connector
+from src.modules.datalake.minio_client import MinioClient
+import logging
+import tempfile
+
+logger = logging.getLogger(__name__)
+
 
 class ExtractionManager:
     def __init__(self):
         self.api_url = "https://api.binance.com/api/v3"
+        
+        # Initialize MinIO client - MANDATORY, no fallback
+        self.minio_client = MinioClient()
+        logger.info("ExtractionManager initialized with MinIO storage")
+
 
     def get_db_connection(self):
         return mysql.connector.connect(
@@ -100,17 +111,21 @@ class ExtractionManager:
             return None
 
     def save_to_datalake(self, data, symbol, data_type):
-        """Save data to local data lake as JSON."""
+        """
+        Save data to MinIO data lake (MANDATORY).
+        
+        Returns:
+            MinIO object path
+        
+        Raises:
+            Exception if MinIO upload fails
+        """
         if not data:
             return None
 
         today = datetime.now().strftime("%Y-%m-%d")
-        save_dir = os.path.join(config.RAW_DATA_DIR, today)
-        os.makedirs(save_dir, exist_ok=True)
-        
         timestamp = int(time.time() * 1000)
         filename = f"{symbol}_{data_type}_{timestamp}.json"
-        filepath = os.path.join(save_dir, filename)
         
         payload = {
             "symbol": symbol,
@@ -121,11 +136,22 @@ class ExtractionManager:
         
         if data_type == "klines":
             payload["interval"] = "1m"
-
-        with open(filepath, 'w') as f:
-            json.dump(payload, f)
         
-        return filepath
+        json_data = json.dumps(payload)
+        
+        # Save to MinIO - MANDATORY, no fallback
+        object_name = f"{today}/{filename}"
+        
+        if not self.minio_client.upload_data(
+            json_data,
+            object_name,
+            bucket=self.minio_client.bucket_raw
+        ):
+            raise Exception(f"Failed to upload to MinIO: {object_name}")
+        
+        # Return MinIO object path
+        return object_name
+
 
     def run_cycle(self):
         """Runs one cycle of extraction for all symbols - SMART VERSION."""
