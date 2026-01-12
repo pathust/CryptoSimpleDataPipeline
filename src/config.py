@@ -10,10 +10,6 @@ DB_USER = os.getenv('DB_USER', 'root')
 DB_PASSWORD = os.getenv('DB_PASSWORD', '300450')
 DB_NAME = os.getenv('DB_NAME', 'crypto_pipeline')
 
-# Data Lake Configuration
-DATA_LAKE_DIR = os.getenv('DATA_LAKE_DIR', './data_lake')
-RAW_DATA_DIR = os.path.join(DATA_LAKE_DIR, 'raw')
-
 # Tracked Symbols
 SYMBOLS_STR = os.getenv('SYMBOLS', 'BTCUSDT,ETHUSDT,BNBUSDT')
 SYMBOLS = [s.strip() for s in SYMBOLS_STR.split(',') if s.strip()]
