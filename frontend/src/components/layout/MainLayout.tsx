@@ -19,9 +19,9 @@ export function MainLayout() {
       }
     };
     loadMetrics();
-    
-    // Reload every 30 seconds
-    const interval = setInterval(loadMetrics, 30000);
+
+    // Reload every 60 seconds
+    const interval = setInterval(loadMetrics, 60000);
     return () => clearInterval(interval);
   }, [refreshKey]);
 

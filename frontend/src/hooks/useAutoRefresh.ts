@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-export const useAutoRefresh = (intervalSeconds: number = 15) => {
+export const useAutoRefresh = (intervalSeconds: number = 60) => {
   const [countdown, setCountdown] = useState(intervalSeconds);
   const [refreshKey, setRefreshKey] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
