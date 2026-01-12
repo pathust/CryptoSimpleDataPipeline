@@ -1,5 +1,4 @@
 import os
-import shutil
 from datetime import datetime, timedelta
 import mysql.connector
 import src.config as config
@@ -10,10 +9,6 @@ logger = logging.getLogger(__name__)
 
 class DataLakeManager:
     def __init__(self):
-        self.raw_dir = config.RAW_DATA_DIR  # Keep for backward compatibility during migration
-        self.archive_dir = os.path.join(config.DATA_LAKE_DIR, "archive")
-        os.makedirs(self.archive_dir, exist_ok=True)
-        
         # Initialize MinIO client - MANDATORY, no fallback
         self.minio_client = MinioClient()
         logger.info("DataLakeManager initialized with MinIO storage")
@@ -75,8 +70,7 @@ class DataLakeManager:
     def archive_old_files(self, days_old=7):
         """
         Archive processed files older than specified days.
-        For MinIO: moves objects from raw bucket to archive bucket.
-        For local: moves files to archive directory.
+        Moves objects from raw bucket to archive bucket.
         """
         cutoff_date = datetime.now() - timedelta(days=days_old)
         archived_count = 0
@@ -136,8 +130,7 @@ class DataLakeManager:
     def cleanup_old_archives(self, days_old=30):
         """
         Delete archived files older than specified days.
-        For MinIO: deletes objects from archive bucket.
-        For local: deletes files from archive directory.
+        Deletes objects from archive bucket.
         """
         cutoff_date = datetime.now() - timedelta(days=days_old)
         deleted_count = 0

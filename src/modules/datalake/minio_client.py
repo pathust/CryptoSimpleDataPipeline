@@ -2,7 +2,6 @@ from minio import Minio
 from minio.error import S3Error
 import src.config as config
 import io
-import os
 import logging
 
 logger = logging.getLogger(__name__)

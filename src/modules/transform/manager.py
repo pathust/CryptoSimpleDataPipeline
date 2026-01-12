@@ -3,7 +3,6 @@ import os
 import mysql.connector
 from datetime import datetime
 import src.config as config
-import glob
 from src.modules.datalake.manager import DataLakeManager
 from src.modules.warehouse.aggregator import WarehouseAggregator
 import tempfile
