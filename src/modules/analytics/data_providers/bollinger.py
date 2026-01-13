@@ -14,7 +14,19 @@ class BollingerProvider(DataProvider):
         period = params.get('period', 20)
         std_dev = params.get('std_dev', 2)
         limit = params.get('limit', 200)
+        interval = params.get('interval', '1m')
         
+        multiplier = 1
+        if interval.endswith('m'):
+            multiplier = int(interval.replace('m', ''))
+        elif interval.endswith('h'):
+            multiplier = int(interval.replace('h', '')) * 60
+        elif interval.endswith('d'):
+            multiplier = int(interval.replace('d', '')) * 1440
+            
+        needed_candles = limit + period + 1
+        fetch_limit = needed_candles * multiplier
+
         try:
             conn = self._get_connection()
             
@@ -30,19 +42,26 @@ class BollingerProvider(DataProvider):
             """
             
             # Lấy dư thêm data để tính SMA đoạn đầu chính xác
-            df = pd.read_sql(query, conn, params=(symbol, limit + period + 5))
+            df = pd.read_sql(query, conn, params=(symbol, fetch_limit))
             conn.close()
             
             if df.empty or len(df) < period:
                 return []
             
-            # 1. FIX QUAN TRỌNG: Convert Decimal sang float để numpy tính toán được
-            df['close_price'] = df['close_price'].astype(float)
-
-            # Reverse chronological order (Cũ nhất lên đầu)
             df = df.iloc[::-1].reset_index(drop=True)
+            df['open_time'] = pd.to_datetime(df['open_time'])
+            df['close_price'] = df['close_price'].astype(float)
             
             prices = df['close_price'].values
+
+            if interval != '1m':
+                df.set_index('open_time', inplace=True)
+                p_interval = interval.replace('m', 'min').replace('h', 'H').replace('d', 'D')
+                df = df.resample(p_interval).agg({'close_price': 'last'}).dropna()
+                df = df.reset_index()
+
+            if len(df) < period:
+                return []
 
             # 2. Tính SMA (Middle Band)
             # mode='valid' sẽ trả về mảng ngắn hơn mảng gốc (len - period + 1)
@@ -72,7 +91,6 @@ class BollingerProvider(DataProvider):
                     'price': round(float(row['close_price']), 8)
                 })
 
-            
             return result
             
         except Exception as e:

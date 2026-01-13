@@ -32,6 +32,14 @@ class CorrelationProvider(DataProvider):
         limit = params.get('limit', 200)
         interval = params.get('interval', '1m')
         
+        multiplier = 1
+        if interval.endswith('m'):
+            multiplier = int(interval.replace('m', ''))
+        elif interval.endswith('h'):
+            multiplier = int(interval.replace('h', '')) * 60
+        elif interval.endswith('d'):
+            multiplier = int(interval.replace('d', '')) * 1440
+
         # If comparison symbols not provided, use other symbols from config
         if not compare_symbol1 or not compare_symbol2:
             available_symbols = [s for s in config.SYMBOLS if s != symbol]
@@ -44,12 +52,11 @@ class CorrelationProvider(DataProvider):
             else:
                 return []
         
+        needed_candles = limit + window + 1
+        fetch_limit = needed_candles * multiplier
+
         try:
             conn = self._get_connection()
-            
-            # Fetch data for all three symbols
-            # We need more data points to calculate rolling correlation
-            fetch_limit = limit + window + 10
             
             # Fetch data for all symbols - use a larger limit to ensure we have enough overlapping timestamps
             query = """
@@ -58,20 +65,23 @@ class CorrelationProvider(DataProvider):
                 close_price,
                 symbol
             FROM fact_klines
-            WHERE symbol IN (%s, %s, %s) AND interval_code = %s
+            WHERE symbol IN (%s, %s, %s) AND interval_code = '1m'
             ORDER BY open_time DESC
             LIMIT %s
             """
             
             # Execute query - fetch enough rows to ensure we have data for all 3 symbols
             # Multiply by 3 to account for 3 symbols, and add buffer
-            df = pd.read_sql(query, conn, params=(symbol, compare_symbol1, compare_symbol2, interval, fetch_limit * 3))
+            df = pd.read_sql(query, conn, params=(symbol, compare_symbol1, compare_symbol2, fetch_limit * 3))
             conn.close()
             
             if df.empty:
                 print(f"Correlation: No data found for symbols {symbol}, {compare_symbol1}, {compare_symbol2}")
                 return []
             
+            df['open_time'] = pd.to_datetime(df['open_time'])
+            df['close_price'] = df['close_price'].astype(float)
+
             # Sort to get chronological order (oldest first)
             df = df.sort_values('open_time').reset_index(drop=True)
             
@@ -86,8 +96,12 @@ class CorrelationProvider(DataProvider):
                 columns='symbol',
                 values='close_price',
                 aggfunc='first'
-            )
+            ).sort_index()
             
+            if interval != '1m':
+                p_interval = interval.replace('m', 'min').replace('h', 'H').replace('d', 'D')
+                price_df = price_df.resample(p_interval).last().dropna()
+
             # Check if all required symbols are present
             required_symbols = [symbol, compare_symbol1, compare_symbol2]
             missing_symbols = [s for s in required_symbols if s not in price_df.columns]

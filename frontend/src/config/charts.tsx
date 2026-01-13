@@ -45,7 +45,7 @@ export const CHART_REGISTRY: ChartConfig[] = [
         dataProvider: 'volume',
         refreshInterval: 15000,
         gridSpan: { cols: 3, rows: 1 },
-        defaultParams: { limit: 200 },
+        defaultParams: { limit: 200, interval: '1m' },
     },
     {
         id: 'rsi',

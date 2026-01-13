@@ -15,12 +15,23 @@ class MACDProvider(DataProvider):
         slow_period = params.get('slow_period', 26)
         signal_period = params.get('signal_period', 9)
         limit = params.get('limit', 200)
+        interval = params.get('interval', '1m')
         
+        multiplier = 1
+        if interval.endswith('m'):
+            multiplier = int(interval.replace('m', ''))
+        elif interval.endswith('h'):
+            multiplier = int(interval.replace('h', '')) * 60
+        elif interval.endswith('d'):
+            multiplier = int(interval.replace('d', '')) * 1440
+
+        needed_candles = limit + slow_period + signal_period + 1
+        fetch_limit = needed_candles * multiplier
+
         try:
             conn = self._get_connection()
             
             # Fetch data (lấy dư ra để tính EMA ban đầu cho chính xác)
-            fetch_limit = limit + slow_period + signal_period + 50
             query = """
             SELECT 
                 open_time,
@@ -37,11 +48,18 @@ class MACDProvider(DataProvider):
             if df.empty or len(df) < slow_period + signal_period:
                 return []
             
-            # 1. FIX QUAN TRỌNG: Ép kiểu sang float để numpy tính toán được
+            df = df.iloc[::-1].reset_index(drop=True)
+            df['open_time'] = pd.to_datetime(df['open_time'])
             df['close_price'] = df['close_price'].astype(float)
             
-            # Reverse to get chronological order (Cũ nhất lên đầu)
-            df = df.iloc[::-1].reset_index(drop=True)
+            if interval != '1m':
+                df.set_index('open_time', inplace=True)
+                p_interval = interval.replace('m', 'min').replace('h', 'H').replace('d', 'D')
+                df = df.resample(p_interval).agg({'close_price': 'last'}).dropna()
+                df = df.reset_index()
+
+            if len(df) < slow_period + signal_period:
+                return []
             
             # Calculate EMAs
             prices = df['close_price'].values
@@ -65,10 +83,11 @@ class MACDProvider(DataProvider):
             # Prepare result
             result = []
             # Chỉ lấy dữ liệu từ điểm đã có đủ cả MACD và Signal
-            start_idx = slow_period + signal_period
-            
-            for i in range(len(df)):
-                if i < start_idx: continue # Bỏ qua đoạn đầu chưa tính đủ chỉ báo
+            # start_idx = slow_period + signal_period
+            start_idx = max(0, len(df) - limit)
+
+            for i in range(start_idx, len(df)):
+                # if i < start_idx: continue # Bỏ qua đoạn đầu chưa tính đủ chỉ báo
                 
                 result.append({
                     'time': self._format_datetime_to_utc(df.iloc[i]['open_time']),
