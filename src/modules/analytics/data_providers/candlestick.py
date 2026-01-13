@@ -53,9 +53,9 @@ class CandlestickProvider(DataProvider):
             # Convert to list of dictionaries
             candlesticks = []
             for _, row in df.iterrows():
-                open_time_utc = row['open_time'].replace(tzinfo=None).isoformat() + 'Z' if pd.notna(row['open_time']) else None
+                open_time_local = row['open_time'].replace(tzinfo=None).isoformat() + 'Z' if pd.notna(row['open_time']) else None
                 candlesticks.append({
-                    'time': open_time_utc,
+                    'time': open_time_local,
                     'open': float(row['open_price']) if pd.notna(row['open_price']) else 0,
                     'high': float(row['high_price']) if pd.notna(row['high_price']) else 0,
                     'low': float(row['low_price']) if pd.notna(row['low_price']) else 0,

@@ -50,12 +50,11 @@ class VolumeProvider(DataProvider):
             # Convert to list of dictionaries
             volume_data = []
             for _, row in df.iterrows():
-                open_time_utc = row['open_time'].replace(tzinfo=None).isoformat() + 'Z' if pd.notna(row['open_time']) else None
                 volume_data.append({
-                    'time': open_time_utc,
+                    'time': self._format_datetime_to_utc(row['open_time']),
                     'volume': float(row['volume']) if pd.notna(row['volume']) else 0,
                     'price': float(row['close_price']) if pd.notna(row['close_price']) else 0,
-                    'open': float(row['open_price']) if pd.notna(row['open_price']) else 0 # Thêm trường open
+                    'open': float(row['open_price']) if pd.notna(row['open_price']) else 0
                 })
             
             return volume_data

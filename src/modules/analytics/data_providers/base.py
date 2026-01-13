@@ -31,6 +31,37 @@ class DataProvider(ABC):
         """Get database connection."""
         return mysql.connector.connect(**self.db_config)
     
+    def _format_datetime_to_utc(self, dt):
+        """
+        Convert MySQL datetime (local timezone) to UTC ISO string.
+        
+        MySQL stores datetime in local timezone (UTC+7 for Vietnam).
+        This method converts it to proper UTC before sending to frontend.
+        
+        Args:
+            dt: datetime object from MySQL (naive, in local timezone)
+            
+        Returns:
+            ISO format string in UTC with 'Z' suffix (e.g., "2026-01-13T07:00:00Z")
+        """
+        if dt is None:
+            return None
+        
+        from datetime import timezone, timedelta
+        
+        # MySQL stores in local timezone (UTC+7)
+        VN_TZ = timezone(timedelta(hours=7))
+        
+        # Mark the naive datetime as being in Vietnam timezone
+        dt_local = dt.replace(tzinfo=VN_TZ)
+        
+        # Convert to UTC
+        dt_utc = dt_local.astimezone(timezone.utc)
+        
+        # Format as ISO string with 'Z' suffix
+        return dt_utc.isoformat().replace('+00:00', 'Z')
+
+    
     @abstractmethod
     def get_data(self, symbol: str, **params) -> Dict[str, Any]:
         """

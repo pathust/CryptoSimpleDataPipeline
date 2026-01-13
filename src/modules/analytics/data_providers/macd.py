@@ -70,9 +70,8 @@ class MACDProvider(DataProvider):
             for i in range(len(df)):
                 if i < start_idx: continue # Bỏ qua đoạn đầu chưa tính đủ chỉ báo
                 
-                open_time_utc = df.iloc[i]['open_time'].replace(tzinfo=None).isoformat() + 'Z'
                 result.append({
-                    'time': open_time_utc,
+                    'time': self._format_datetime_to_utc(df.iloc[i]['open_time']),
                     'macd': round(float(macd_line[i]), 8),
                     'signal': round(float(signal_line[i]), 8),
                     'histogram': round(float(histogram[i]), 8)

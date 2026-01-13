@@ -64,14 +64,14 @@ class BollingerProvider(DataProvider):
             # Prepare result
             result = []
             for idx, row in df_result.iterrows():
-                open_time_utc = row['open_time'].replace(tzinfo=None).isoformat() + 'Z'
                 result.append({
-                    'time': open_time_utc,
+                    'time': self._format_datetime_to_utc(row['open_time']),
                     'upper': round(float(upper_band[idx]), 8),
                     'middle': round(float(row['sma']), 8),
                     'lower': round(float(lower_band[idx]), 8),
                     'price': round(float(row['close_price']), 8)
                 })
+
             
             return result
             

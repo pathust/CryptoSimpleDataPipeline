@@ -149,9 +149,8 @@ class CorrelationProvider(DataProvider):
             # Prepare result
             result = []
             for i, timestamp in enumerate(timestamps):
-                open_time_utc = timestamp.replace(tzinfo=None).isoformat() + 'Z'
                 result.append({
-                    'time': open_time_utc,
+                    'time': self._format_datetime_to_utc(timestamp),
                     'correlation1': round(correlations1[i], 4),
                     'correlation2': round(correlations2[i], 4),
                     'symbol1': compare_symbol1,

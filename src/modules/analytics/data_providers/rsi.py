@@ -86,9 +86,8 @@ class RSIProvider(DataProvider):
             for i in range(len(rsi_values)):
                 idx = i + period
                 if idx < len(df):
-                    open_time_utc = df.iloc[idx]['open_time'].replace(tzinfo=None).isoformat() + 'Z'
                     result.append({
-                        'time': open_time_utc,
+                        'time': self._format_datetime_to_utc(df.iloc[idx]['open_time']),
                         'rsi': round(rsi_values[i], 2)
                     })
             
