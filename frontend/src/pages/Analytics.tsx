@@ -14,11 +14,21 @@ import { CHART_REGISTRY, getDefaultEnabledCharts } from "@/config/charts";
 
 const VALID_SYMBOLS = ['BTC_USDT', 'ETH_USDT', 'BNB_USDT'];
 
+const INTERVALS = [
+    { label: '1m', value: '1m' },
+    { label: '5m', value: '5m' },
+    { label: '15m', value: '15m' },
+    { label: '1h', value: '1h' },
+    { label: '4h', value: '4h' },
+    { label: '1d', value: '1d' },
+];
+
 export default function Analytics() {
     const { symbol } = useParams<{ symbol: string }>();
     const [enabledCharts, setEnabledCharts] = useState<Set<string>>(
         new Set(getDefaultEnabledCharts())
     );
+    const [interval, setInterval] = useState<string>('1m');
 
     // Validate symbol and redirect if invalid
     if (!symbol || !VALID_SYMBOLS.includes(symbol)) {
@@ -57,6 +67,22 @@ export default function Analytics() {
                     </p>
                 </div>
 
+                <div className="flex bg-card border border-border rounded-md p-1">
+                    {INTERVALS.map((int) => (
+                        <button
+                            key={int.value}
+                            onClick={() => setInterval(int.value)}
+                            className={`px-3 py-1 text-sm rounded-sm transition-colors ${
+                                interval === int.value 
+                                ? 'bg-primary text-primary-foreground' 
+                                : 'hover:bg-accent text-muted-foreground'
+                            }`}
+                        >
+                            {int.label}
+                        </button>
+                    ))}
+                </div>
+
                 {/* Cryptocurrency Selector */}
                 <select
                     value={symbol}
@@ -79,6 +105,7 @@ export default function Analytics() {
                                 key={chart.id}
                                 config={chart}
                                 symbol={symbol}
+                                interval={interval}
                             />
                         ))}
                     </div>

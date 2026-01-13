@@ -28,6 +28,16 @@ class VolumeProfileProvider(DataProvider):
         limit = params.get('limit', 200)
         interval = params.get('interval', '1m')
         
+        multiplier = 1
+        if interval.endswith('m'):
+            multiplier = int(interval.replace('m', ''))
+        elif interval.endswith('h'):
+            multiplier = int(interval.replace('h', '')) * 60
+        elif interval.endswith('d'):
+            multiplier = int(interval.replace('d', '')) * 1440
+            
+        fetch_limit = limit * multiplier
+
         try:
             conn = self._get_connection()
             
@@ -40,17 +50,20 @@ class VolumeProfileProvider(DataProvider):
                 open_price,
                 volume
             FROM fact_klines
-            WHERE symbol = %s AND interval_code = %s
+            WHERE symbol = %s AND interval_code = '1m'
             ORDER BY open_time DESC
             LIMIT %s
             """
             
-            df = pd.read_sql(query, conn, params=(symbol, interval, limit))
+            df = pd.read_sql(query, conn, params=(symbol, fetch_limit))
             conn.close()
             
             if df.empty:
                 return []
-            
+
+            for col in ['high_price', 'low_price', 'close_price', 'open_price', 'volume']:
+                df[col] = df[col].astype(float)
+
             # Reverse to get chronological order
             df = df.iloc[::-1]
             

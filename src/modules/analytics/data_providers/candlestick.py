@@ -23,44 +23,66 @@ class CandlestickProvider(DataProvider):
         """
         limit = params.get('limit', 200)
         interval = params.get('interval', '1m')
-        
+        print(f"Fetching {limit} candlesticks for {symbol} at interval {interval}")
+        multiplier = 1
+        if interval.endswith('m'):
+            multiplier = int(interval.replace('m', ''))
+        elif interval.endswith('h'):
+            multiplier = int(interval.replace('h', '')) * 60
+        elif interval.endswith('d'):
+            multiplier = int(interval.replace('d', '')) * 1440
+            
+        fetch_limit = limit * multiplier
+
         try:
             conn = self._get_connection()
             
             query = """
-            SELECT 
-                open_time,
-                open_price,
-                high_price,
-                low_price,
-                close_price,
-                volume
+            SELECT open_time, open_price, high_price, low_price, close_price, volume
             FROM fact_klines
-            WHERE symbol = %s AND interval_code = %s
+            WHERE symbol = %s
             ORDER BY open_time DESC
             LIMIT %s
             """
             
-            df = pd.read_sql(query, conn, params=(symbol, interval, limit))
+            df = pd.read_sql(query, conn, params=(symbol, fetch_limit))
             conn.close()
             
             if df.empty:
+                print("No candlestick data found.")                
                 return []
             
-            # Reverse to get chronological order
             df = df.iloc[::-1]
             
-            # Convert to list of dictionaries
+            # if interval != '1m':
+            df['open_time'] = pd.to_datetime(df['open_time'])
+            df.set_index('open_time', inplace=True)
+            
+            p_interval = interval.replace('m', 'min')
+            
+            df = df.resample(p_interval).agg({
+                'open_price': 'first',
+                'high_price': 'max',
+                'low_price': 'min',
+                'close_price': 'last',
+                'volume': 'sum'
+            }).dropna()
+            df = df.reset_index()
+
+            df = df.tail(limit)
+
             candlesticks = []
             for _, row in df.iterrows():
-                open_time_local = row['open_time'].replace(tzinfo=None).isoformat() + 'Z' if pd.notna(row['open_time']) else None
+                t_val = row['open_time'] if 'open_time' in row else row.name
+                open_time_local = t_val.replace(tzinfo=None).isoformat() + 'Z'
+                
                 candlesticks.append({
                     'time': open_time_local,
-                    'open': float(row['open_price']) if pd.notna(row['open_price']) else 0,
-                    'high': float(row['high_price']) if pd.notna(row['high_price']) else 0,
-                    'low': float(row['low_price']) if pd.notna(row['low_price']) else 0,
-                    'close': float(row['close_price']) if pd.notna(row['close_price']) else 0,
-                    'volume': float(row['volume']) if pd.notna(row['volume']) else 0
+                    'open': float(row['open_price']),
+                    'high': float(row['high_price']),
+                    'low': float(row['low_price']),
+                    'close': float(row['close_price']),
+                    'volume': float(row['volume'])
                 })
             
             return candlesticks

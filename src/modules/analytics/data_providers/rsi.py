@@ -24,7 +24,19 @@ class RSIProvider(DataProvider):
         """
         period = params.get('period', 14)
         limit = params.get('limit', 200)
+        interval = params.get('interval', '1m')
         
+        multiplier = 1
+        if interval.endswith('m'):
+            multiplier = int(interval.replace('m', ''))
+        elif interval.endswith('h'):
+            multiplier = int(interval.replace('h', '')) * 60
+        elif interval.endswith('d'):
+            multiplier = int(interval.replace('d', '')) * 1440
+            
+        needed_candles = limit + period + 1 
+        fetch_limit = needed_candles * multiplier
+
         try:
             conn = self._get_connection()
             
@@ -39,7 +51,7 @@ class RSIProvider(DataProvider):
             LIMIT %s
             """
             
-            df = pd.read_sql(query, conn, params=(symbol, limit + period + 1))
+            df = pd.read_sql(query, conn, params=(symbol, fetch_limit))
             conn.close()
             
             if df.empty or len(df) < period + 1:
@@ -47,7 +59,18 @@ class RSIProvider(DataProvider):
             
             # Reverse to get chronological order
             df = df.iloc[::-1]
-            
+            df['open_time'] = pd.to_datetime(df['open_time'])
+            df['close_price'] = df['close_price'].astype(float)
+
+            if interval != '1m':
+                df.set_index('open_time', inplace=True)
+                p_interval = interval.replace('m', 'min').replace('h', 'H').replace('d', 'D')
+                df = df.resample(p_interval).agg({'close_price': 'last'}).dropna()
+                df = df.reset_index()
+
+            if len(df) < period + 1:
+                return []
+
             # Calculate RSI
             prices = df['close_price'].values
             deltas = np.diff(prices)

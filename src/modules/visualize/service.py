@@ -47,6 +47,71 @@ class VisualizeService:
             print(f"Error fetching data for {symbol}: {e}")
             return []
     
+
+    def get_kline_data_with_interval(self, symbol, interval='1m', limit=500):
+        try:
+            multiplier = 1
+            if interval.endswith('m'):
+                multiplier = int(interval.replace('m', ''))
+            elif interval.endswith('h'):
+                multiplier = int(interval.replace('h', '')) * 60
+            elif interval.endswith('d'):
+                multiplier = int(interval.replace('d', '')) * 1440
+            
+            fetch_limit = limit * multiplier
+
+            conn = self.get_db_connection()
+            query = f"""
+            SELECT open_time, open_price, high_price, low_price, close_price, volume
+            FROM fact_klines
+            WHERE symbol = %s
+            ORDER BY open_time DESC
+            LIMIT %s
+            """
+            
+            df = pd.read_sql(query, conn, params=(symbol, fetch_limit))
+            conn.close()
+            
+            if df.empty:
+                return []
+
+            df = df.sort_values('open_time')
+            
+            if interval != '1m':
+                df['open_time'] = pd.to_datetime(df['open_time'])
+                df.set_index('open_time', inplace=True)
+                
+                logic = {
+                    'open_price': 'first',
+                    'high_price': 'max',
+                    'low_price': 'min',
+                    'close_price': 'last',
+                    'volume': 'sum'
+                }
+                
+                pandas_interval = interval.replace('m', 'min')
+                
+                df = df.resample(pandas_interval).agg(logic).dropna()
+                df.reset_index(inplace=True)
+
+            df = df.tail(limit)
+            
+            data = []
+            for _, row in df.iterrows():
+                data.append({
+                    'time': int(row['open_time'].timestamp()),
+                    'open': float(row['open_price']),
+                    'high': float(row['high_price']),
+                    'low': float(row['low_price']),
+                    'close': float(row['close_price']),
+                    'volume': float(row['volume'])
+                })
+            return data
+            
+        except Exception as e:
+            print(f"Error fetching data for {symbol} with interval {interval}: {e}")
+            return []
+
     def get_statistics(self, symbol):
         """Get market statistics for a symbol."""
         try:

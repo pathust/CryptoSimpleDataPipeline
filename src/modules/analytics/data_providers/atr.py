@@ -28,6 +28,17 @@ class ATRProvider(DataProvider):
         limit = params.get('limit', 200)
         interval = params.get('interval', '1m')
         
+        multiplier = 1
+        if interval.endswith('m'):
+            multiplier = int(interval.replace('m', ''))
+        elif interval.endswith('h'):
+            multiplier = int(interval.replace('h', '')) * 60
+        elif interval.endswith('d'):
+            multiplier = int(interval.replace('d', '')) * 1440
+            
+        needed_candles = limit + period + 1
+        fetch_limit = needed_candles * multiplier
+
         try:
             conn = self._get_connection()
             
@@ -39,20 +50,33 @@ class ATRProvider(DataProvider):
                 low_price,
                 close_price
             FROM fact_klines
-            WHERE symbol = %s AND interval_code = %s
+            WHERE symbol = %s AND interval_code = '1m'
             ORDER BY open_time DESC
             LIMIT %s
             """
             
-            df = pd.read_sql(query, conn, params=(symbol, interval, limit + period + 1))
+            df = pd.read_sql(query, conn, params=(symbol, fetch_limit))
             conn.close()
             
-            if df.empty or len(df) < period + 1:
-                return []
-            
             # Reverse to get chronological order
-            df = df.iloc[::-1]
+            df = df.iloc[::-1].reset_index(drop=True)
+            df['open_time'] = pd.to_datetime(df['open_time'])
+            for col in ['high_price', 'low_price', 'close_price']:
+                df[col] = df[col].astype(float)
             
+            if interval != '1m':
+                df.set_index('open_time', inplace=True)
+                p_interval = interval.replace('m', 'min').replace('h', 'H').replace('d', 'D')
+                df = df.resample(p_interval).agg({
+                    'high_price': 'max',
+                    'low_price': 'min',
+                    'close_price': 'last'
+                }).dropna()
+                df = df.reset_index()
+
+            if len(df) < period + 1:
+                return []
+
             # Calculate True Range
             # TR = max(high - low, abs(high - prev_close), abs(low - prev_close))
             high = df['high_price'].values
@@ -73,7 +97,7 @@ class ATRProvider(DataProvider):
             # Calculate ATR using Wilder's smoothing method (same as RSI)
             # Initial ATR = Simple Average of first period TRs
             atr_values = []
-            atr = np.mean(true_range[:period])
+            atr = np.mean(true_range[1:period+1])  # Skip first TR as it uses rolled value
             atr_values.append(atr)
             
             # Subsequent ATR = ((period - 1) * previous_ATR + current_TR) / period

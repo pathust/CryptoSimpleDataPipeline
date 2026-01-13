@@ -15,16 +15,17 @@ import { ChartConfig } from "@/types/charts";
 interface ChartContainerProps {
     config: ChartConfig;
     symbol: string;
+    interval?: string;
 }
 
-export function ChartContainer({ config, symbol }: ChartContainerProps) {
+export function ChartContainer({ config, symbol, interval }: ChartContainerProps) {
     // Convert URL format (BTC_USDT) to API format (BTCUSDT)
     const apiSymbol = symbol.replace(/_/g, '');
 
     const { data, loading, error, refetch } = useChartData({
         symbol: apiSymbol,
         endpoint: config.dataProvider,
-        params: config.defaultParams,
+        params: { ...config.defaultParams, interval: interval },
         refreshInterval: config.refreshInterval,
         enabled: true,
     });
