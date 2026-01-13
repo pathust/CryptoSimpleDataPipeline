@@ -48,11 +48,25 @@ export default function Analytics() {
             <motion.div
                 initial={{ opacity: 0, y: -20 }}
                 animate={{ opacity: 1, y: 0 }}
+                className="flex items-center justify-between"
             >
-                <h1 className="text-2xl font-bold text-foreground">Market Analytics</h1>
-                <p className="text-muted-foreground">
-                    Professional trading analysis and technical indicators
-                </p>
+                <div>
+                    <h1 className="text-2xl font-bold text-foreground">Market Analytics</h1>
+                    <p className="text-muted-foreground">
+                        Professional trading analysis and technical indicators
+                    </p>
+                </div>
+
+                {/* Cryptocurrency Selector */}
+                <select
+                    value={symbol}
+                    onChange={(e) => window.location.href = `/analytics/${e.target.value}`}
+                    className="h-10 px-4 py-2 bg-card text-foreground border border-border rounded-md hover:bg-accent focus:outline-none focus:ring-2 focus:ring-primary cursor-pointer"
+                >
+                    <option value="BTC_USDT">₿ Bitcoin (BTC)</option>
+                    <option value="ETH_USDT">Ξ Ethereum (ETH)</option>
+                    <option value="BNB_USDT">◆ BNB</option>
+                </select>
             </motion.div>
 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
