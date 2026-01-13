@@ -30,65 +30,57 @@ interface BollingerDataPoint {
   price: number;
 }
 
-// 1. Component Tooltip Tùy Chỉnh
+
+// Chart Component
 // ------------------------------------------------------------------
-const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
-  if (active && payload && payload.length) {
-    return (
-      <div className="bg-[#1E2329] border border-[#474D57] rounded p-3 shadow-xl text-xs min-w-[160px]">
-        {/* Dòng hiển thị Thời gian */}
-        <p className="text-[#848E9C] mb-2 font-medium">{label}</p>
+export function BollingerChart({ data, params = {} }: ChartProps) {
+  const period = params.period ?? 20;
+  const stdDev = params.std_dev ?? 2;
 
-        {/* Danh sách các chỉ số */}
-        <div className="space-y-1.5">
-          {payload.map((entry, index) => {
-            // Mapping tên dataKey sang Label hiển thị đẹp hơn
-            let displayName = entry.name;
-            let displayColor = entry.color;
-            
-            if (entry.dataKey === 'price') {
-              displayName = 'Price';
-              displayColor = THEME.textMain;
-            } else if (entry.dataKey === 'upper') {
-              displayName = 'Upper Band';
-              displayColor = THEME.brand;
-            } else if (entry.dataKey === 'lower') {
-              displayName = 'Lower Band';
-              displayColor = THEME.brand;
-            } else if (entry.dataKey === 'middle') {
-              displayName = 'SMA (20)';
-              displayColor = THEME.purple;
-            }
+  // Custom Tooltip (defined inside to access period)
+  const CustomTooltip = ({ active, payload, label }: TooltipProps<number, string>) => {
+    if (active && payload && payload.length) {
+      return (
+        <div className="bg-[#1E2329] border border-[#474D57] rounded p-3 shadow-xl text-xs min-w-[160px]">
+          <p className="text-[#848E9C] mb-2 font-medium">{label}</p>
+          <div className="space-y-1.5">
+            {payload.map((entry, index) => {
+              let displayName = entry.name;
+              let displayColor = entry.color;
 
-            return (
-              <div key={index} className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-2">
-                  {/* Dấu chấm màu định danh */}
-                  <div 
-                    className="w-1.5 h-1.5 rounded-full" 
-                    style={{ backgroundColor: displayColor }}
-                  />
-                  <span style={{ color: '#848E9C' }}>{displayName}</span>
+              if (entry.dataKey === 'price') {
+                displayName = 'Price';
+                displayColor = THEME.textMain;
+              } else if (entry.dataKey === 'upper') {
+                displayName = 'Upper Band';
+                displayColor = THEME.brand;
+              } else if (entry.dataKey === 'lower') {
+                displayName = 'Lower Band';
+                displayColor = THEME.brand;
+              } else if (entry.dataKey === 'middle') {
+                displayName = `SMA (${period})`;
+                displayColor = THEME.purple;
+              }
+
+              return (
+                <div key={index} className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: displayColor }} />
+                    <span style={{ color: '#848E9C' }}>{displayName}</span>
+                  </div>
+                  <span className="font-mono font-medium" style={{ color: displayColor }}>
+                    {entry.value?.toFixed(2)}
+                  </span>
                 </div>
-                <span 
-                  className="font-mono font-medium" 
-                  style={{ color: displayColor }}
-                >
-                  {entry.value?.toFixed(2)}
-                </span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
-    );
-  }
-  return null;
-};
+      );
+    }
+    return null;
+  };
 
-// 2. Chart Component Chính
-// ------------------------------------------------------------------
-export function BollingerChart({ data }: ChartProps) {
   if (!data || !Array.isArray(data) || data.length === 0) {
     return (
       <div className="flex items-center justify-center h-[300px] bg-[#161A25] text-[#848E9C] border border-[#2B2F36] rounded-lg">
@@ -113,8 +105,8 @@ export function BollingerChart({ data }: ChartProps) {
 
   return (
     <div className="w-full bg-[#161A25] rounded-lg border border-[#2B2F36] p-4">
-       <div className="flex items-center gap-2 mb-4 text-xs font-medium">
-        <span style={{ color: THEME.textMain }}>Bollinger Bands (20, 2)</span>
+      <div className="flex items-center gap-2 mb-4 text-xs font-medium">
+        <span style={{ color: THEME.textMain }}>Bollinger Bands ({period}, {stdDev})</span>
       </div>
 
       <ResponsiveContainer width="100%" height={300}>
@@ -148,15 +140,15 @@ export function BollingerChart({ data }: ChartProps) {
           />
 
           {/* SỬ DỤNG CUSTOM TOOLTIP TẠI ĐÂY */}
-          <Tooltip 
-            content={<CustomTooltip />} 
+          <Tooltip
+            content={<CustomTooltip />}
             cursor={{ stroke: THEME.textSub, strokeDasharray: '3 3', strokeOpacity: 0.5 }}
           />
 
           {/* Các thành phần vẽ biểu đồ (Layers) */}
           {/* Lớp nền Gradient */}
           <Area type="monotone" dataKey="upper" stroke="none" fill="url(#bandGradient)" animationDuration={300} />
-          
+
           {/* Lớp che (Mask) để tạo vùng giữa Upper và Lower */}
           <Area type="monotone" dataKey="lower" stroke="none" fill={THEME.bg} fillOpacity={1} animationDuration={300} />
 
@@ -164,7 +156,7 @@ export function BollingerChart({ data }: ChartProps) {
           <Line type="monotone" dataKey="upper" stroke={THEME.brand} strokeWidth={1} dot={false} strokeOpacity={0.5} strokeDasharray="3 3" animationDuration={300} />
           <Line type="monotone" dataKey="lower" stroke={THEME.brand} strokeWidth={1} dot={false} strokeOpacity={0.5} strokeDasharray="3 3" animationDuration={300} />
           <Line type="monotone" dataKey="middle" stroke={THEME.purple} strokeWidth={1.5} dot={false} strokeOpacity={0.8} animationDuration={300} />
-          
+
           {/* Đường giá (Vẽ cuối cùng để đè lên trên) */}
           <Line type="monotone" dataKey="price" stroke={THEME.textMain} strokeWidth={2} dot={false} isAnimationActive={false} />
         </ComposedChart>

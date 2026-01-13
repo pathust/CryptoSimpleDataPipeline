@@ -12,7 +12,9 @@ interface ATRDataPoint {
     atr: number;
 }
 
-export function ATRChart({ data }: ChartProps) {
+export function ATRChart({ data, params = {} }: ChartProps) {
+    const period = params.period ?? 14;
+
     if (!data || !Array.isArray(data) || data.length === 0) {
         return (
             <div className="flex items-center justify-center h-64 text-muted-foreground">
@@ -46,7 +48,7 @@ export function ATRChart({ data }: ChartProps) {
                         fontSize={12}
                         tickLine={false}
                         axisLine={false}
-                        label={{ value: 'ATR', angle: -90, position: 'insideLeft' }}
+                        label={{ value: `ATR(${period})`, angle: -90, position: 'insideLeft' }}
                     />
                     <Tooltip
                         contentStyle={{
@@ -55,7 +57,7 @@ export function ATRChart({ data }: ChartProps) {
                             borderRadius: '8px',
                         }}
                         labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
-                        formatter={(value: number) => [value.toFixed(4), 'ATR']}
+                        formatter={(value: number) => [value.toFixed(4), `ATR(${period})`]}
                     />
 
                     <Line
@@ -70,7 +72,7 @@ export function ATRChart({ data }: ChartProps) {
 
             {/* Info */}
             <div className="flex items-center justify-center text-xs text-muted-foreground">
-                <span>Average True Range - Measures market volatility</span>
+                <span>Average True Range (Period: {period}) - Measures market volatility</span>
             </div>
         </div>
     );

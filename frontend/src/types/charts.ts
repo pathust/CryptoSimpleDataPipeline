@@ -16,6 +16,7 @@ export interface ChartProps {
     loading: boolean;
     error: string | null;
     onRefresh?: () => void;
+    params?: Record<string, any>; // Current parameter values
 }
 
 /**
@@ -57,6 +58,38 @@ export interface ChartConfig {
 
     /** Default parameters for the data provider */
     defaultParams?: Record<string, any>;
+
+    /** Parameter schema for configurable parameters */
+    parameterSchema?: Record<string, ParameterSchema>;
+}
+
+/**
+ * Schema definition for a configurable parameter
+ */
+export interface ParameterSchema {
+    /** Display label for the parameter */
+    label: string;
+
+    /** Input type */
+    type: 'number' | 'select';
+
+    /** Default value */
+    default: any;
+
+    /** Minimum value (for number type) */
+    min?: number;
+
+    /** Maximum value (for number type) */
+    max?: number;
+
+    /** Step value (for number type) */
+    step?: number;
+
+    /** Options (for select type) */
+    options?: { label: string; value: any }[];
+
+    /** Description/tooltip text */
+    description?: string;
 }
 
 /**

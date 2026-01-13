@@ -11,7 +11,9 @@ interface RSIDataPoint {
     rsi: number;
 }
 
-export function RSIChart({ data }: ChartProps) {
+export function RSIChart({ data, params = {} }: ChartProps) {
+    const period = params.period ?? 14;
+
     if (!data || !Array.isArray(data) || data.length === 0) {
         return (
             <div className="flex items-center justify-center h-64 text-muted-foreground">
@@ -52,7 +54,7 @@ export function RSIChart({ data }: ChartProps) {
                             borderRadius: '8px',
                         }}
                         labelStyle={{ color: 'hsl(var(--popover-foreground))' }}
-                        formatter={(value: number) => [value.toFixed(2), 'RSI']}
+                        formatter={(value: number) => [value.toFixed(2), `RSI(${period})`]}
                     />
 
                     {/* Overbought line */}
@@ -80,6 +82,9 @@ export function RSIChart({ data }: ChartProps) {
                 <div className="flex items-center gap-1">
                     <div className="w-3 h-0.5 bg-chart-2" />
                     <span>Oversold (30)</span>
+                </div>
+                <div className="flex items-center gap-1">
+                    <span>Period: {period}</span>
                 </div>
             </div>
         </div>

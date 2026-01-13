@@ -24,17 +24,21 @@ const calculateSMA = (data: any[], count: number) => {
     return result;
 };
 
-export function CandlestickChartWrapper({ symbol, data, loading, error }: ChartProps) {
+export function CandlestickChartWrapper({ symbol, data, loading, error, params = {} }: ChartProps) {
+    const ma1Period = params.ma1_period ?? 7;
+    const ma2Period = params.ma2_period ?? 25;
+    const ma3Period = params.ma3_period ?? 99;
+
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const legendRef = useRef<HTMLDivElement>(null);
-    
+
     const chartRef = useRef<IChartApi | null>(null);
     const candleSeriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
     const volumeSeriesRef = useRef<ISeriesApi<'Histogram'> | null>(null);
-    
-    const ma7SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
-    const ma25SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
-    const ma99SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+
+    const ma1SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+    const ma2SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+    const ma3SeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
 
     useEffect(() => {
         const container = chartContainerRef.current;
@@ -109,7 +113,7 @@ export function CandlestickChartWrapper({ symbol, data, loading, error }: ChartP
             lastValueVisible: false, // TẮT SỐ BÊN CẠNH
             priceLineVisible: false, // TẮT ĐƯỜNG KẺ NGANG
         });
-        
+
         // Đẩy volume xuống sát đáy (giống Binance)
         volumeSeries.priceScale().applyOptions({
             scaleMargins: {
@@ -119,45 +123,42 @@ export function CandlestickChartWrapper({ symbol, data, loading, error }: ChartP
         });
         volumeSeriesRef.current = volumeSeries;
 
-        // --- 3. MOVING AVERAGES ---
-        // Quan trọng: Set lastValueVisible: false để ẩn số bên phải
-        
-        // MA7 - Vàng
-        const ma7Series = chart.addLineSeries({ 
-            color: '#F0B90B', 
-            lineWidth: 1, 
+        // MA1 - Vàng
+        const ma1Series = chart.addLineSeries({
+            color: '#F0B90B',
+            lineWidth: 1,
             lastValueVisible: false, // Ẩn nhãn trục Y
             priceLineVisible: false, // Ẩn đường kẻ ngang
             crosshairMarkerVisible: false // Ẩn chấm tròn khi hover
         });
-        ma7SeriesRef.current = ma7Series;
-        
-        // MA25 - Tím
-        const ma25Series = chart.addLineSeries({ 
-            color: '#C026D3', 
-            lineWidth: 1, 
-            lastValueVisible: false, 
-            priceLineVisible: false, 
-            crosshairMarkerVisible: false 
-        });
-        ma25SeriesRef.current = ma25Series;
+        ma1SeriesRef.current = ma1Series;
 
-        // MA99 - Xanh
-        const ma99Series = chart.addLineSeries({ 
-            color: '#3B82F6', 
-            lineWidth: 1, 
-            lastValueVisible: false, 
-            priceLineVisible: false, 
-            crosshairMarkerVisible: false 
+        // MA2 - Tím
+        const ma2Series = chart.addLineSeries({
+            color: '#C026D3',
+            lineWidth: 1,
+            lastValueVisible: false,
+            priceLineVisible: false,
+            crosshairMarkerVisible: false
         });
-        ma99SeriesRef.current = ma99Series;
+        ma2SeriesRef.current = ma2Series;
+
+        // MA3 - Xanh
+        const ma3Series = chart.addLineSeries({
+            color: '#3B82F6',
+            lineWidth: 1,
+            lastValueVisible: false,
+            priceLineVisible: false,
+            crosshairMarkerVisible: false
+        });
+        ma3SeriesRef.current = ma3Series;
 
         // --- LEGEND LOGIC (Góc trái trên cùng) ---
         chart.subscribeCrosshairMove((param) => {
             if (!legendRef.current) return;
-            
+
             const legend = legendRef.current;
-            
+
             if (
                 param.point === undefined ||
                 !param.time ||
@@ -171,9 +172,9 @@ export function CandlestickChartWrapper({ symbol, data, loading, error }: ChartP
 
             const candleData = param.seriesData.get(candleSeries) as any;
             const volData = param.seriesData.get(volumeSeries) as any;
-            const ma7Data = param.seriesData.get(ma7Series) as any;
-            const ma25Data = param.seriesData.get(ma25Series) as any;
-            const ma99Data = param.seriesData.get(ma99Series) as any;
+            const ma1Data = param.seriesData.get(ma1Series) as any;
+            const ma2Data = param.seriesData.get(ma2Series) as any;
+            const ma3Data = param.seriesData.get(ma3Series) as any;
 
             if (candleData) {
                 const color = candleData.close >= candleData.open ? 'text-[#0ECB81]' : 'text-[#F6465D]';
@@ -185,12 +186,12 @@ export function CandlestickChartWrapper({ symbol, data, loading, error }: ChartP
                             <span class="text-gray-400">High <span class="${color}">${formatPrice(candleData.high)}</span></span>
                             <span class="text-gray-400">Low <span class="${color}">${formatPrice(candleData.low)}</span></span>
                             <span class="text-gray-400">Close <span class="${color}">${formatPrice(candleData.close)}</span></span>
-                            <span class="text-gray-400">Change <span class="${color}">${((candleData.close - candleData.open)/candleData.open * 100).toFixed(2)}%</span></span>
+                            <span class="text-gray-400">Change <span class="${color}">${((candleData.close - candleData.open) / candleData.open * 100).toFixed(2)}%</span></span>
                         </div>
                         <div class="flex items-center gap-3">
-                             ${!isNaN(ma7Data?.value) ? `<span class="text-[#F0B90B]">MA(7) ${formatPrice(ma7Data.value)}</span>` : ''}
-                             ${!isNaN(ma25Data?.value) ? `<span class="text-[#C026D3]">MA(25) ${formatPrice(ma25Data.value)}</span>` : ''}
-                             ${!isNaN(ma99Data?.value) ? `<span class="text-[#3B82F6]">MA(99) ${formatPrice(ma99Data.value)}</span>` : ''}
+                             ${!isNaN(ma1Data?.value) ? `<span class="text-[#F0B90B]">MA(${ma1Period}) ${formatPrice(ma1Data.value)}</span>` : ''}
+                             ${!isNaN(ma2Data?.value) ? `<span class="text-[#C026D3]">MA(${ma2Period}) ${formatPrice(ma2Data.value)}</span>` : ''}
+                             ${!isNaN(ma3Data?.value) ? `<span class="text-[#3B82F6]">MA(${ma3Period}) ${formatPrice(ma3Data.value)}</span>` : ''}
                         </div>
                          <div class="flex items-center gap-3">
                              ${volData ? `<span class="text-gray-400">Vol(BTC): <span class="text-gray-300">${formatVolume(volData.value)}</span></span>` : ''}
@@ -211,7 +212,7 @@ export function CandlestickChartWrapper({ symbol, data, loading, error }: ChartP
             window.removeEventListener('resize', handleResize);
             chart.remove();
         };
-    }, []);
+    }, []); // Chart only created once on mount
 
     // Update Data Effect (Giữ nguyên logic cũ nhưng gọn hơn)
     useEffect(() => {
@@ -219,7 +220,7 @@ export function CandlestickChartWrapper({ symbol, data, loading, error }: ChartP
         if (!candleSeriesRef.current) return;
 
         const sortedData = [...data].sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-        
+
         const chartData = sortedData.map((item: any) => ({
             time: (new Date(item.time).getTime() / 1000) as UTCTimestamp,
             open: parseFloat(item.open),
@@ -231,26 +232,26 @@ export function CandlestickChartWrapper({ symbol, data, loading, error }: ChartP
         const volumeData = sortedData.map((item: any) => ({
             time: (new Date(item.time).getTime() / 1000) as UTCTimestamp,
             value: parseFloat(item.volume),
-            color: parseFloat(item.close) >= parseFloat(item.open) ? 'rgba(14, 203, 129, 0.4)' : 'rgba(246, 70, 93, 0.4)', 
+            color: parseFloat(item.close) >= parseFloat(item.open) ? 'rgba(14, 203, 129, 0.4)' : 'rgba(246, 70, 93, 0.4)',
         }));
 
-        const ma7Data = calculateSMA(chartData, 7);
-        const ma25Data = calculateSMA(chartData, 25);
-        const ma99Data = calculateSMA(chartData, 99);
+        const ma1Data = calculateSMA(chartData, ma1Period);
+        const ma2Data = calculateSMA(chartData, ma2Period);
+        const ma3Data = calculateSMA(chartData, ma3Period);
 
         candleSeriesRef.current.setData(chartData);
         volumeSeriesRef.current?.setData(volumeData);
-        ma7SeriesRef.current?.setData(ma7Data);
-        ma25SeriesRef.current?.setData(ma25Data);
-        ma99SeriesRef.current?.setData(ma99Data);
+        ma1SeriesRef.current?.setData(ma1Data);
+        ma2SeriesRef.current?.setData(ma2Data);
+        ma3SeriesRef.current?.setData(ma3Data);
 
         // Set Default Legend (Last candle)
         if (legendRef.current && chartData.length > 0) {
             const last = chartData[chartData.length - 1];
             const lastVol = volumeData[volumeData.length - 1];
-            const lastMa7 = ma7Data[ma7Data.length - 1];
-            const lastMa25 = ma25Data[ma25Data.length - 1];
-            const lastMa99 = ma99Data[ma99Data.length - 1];
+            const lastMa1 = ma1Data[ma1Data.length - 1];
+            const lastMa2 = ma2Data[ma2Data.length - 1];
+            const lastMa3 = ma3Data[ma3Data.length - 1];
             const color = last.close >= last.open ? 'text-[#0ECB81]' : 'text-[#F6465D]';
 
             legendRef.current.innerHTML = `
@@ -260,12 +261,12 @@ export function CandlestickChartWrapper({ symbol, data, loading, error }: ChartP
                         <span class="text-gray-400">High <span class="${color}">${formatPrice(last.high)}</span></span>
                         <span class="text-gray-400">Low <span class="${color}">${formatPrice(last.low)}</span></span>
                         <span class="text-gray-400">Close <span class="${color}">${formatPrice(last.close)}</span></span>
-                        <span class="text-gray-400">Change <span class="${color}">${((last.close - last.open)/last.open * 100).toFixed(2)}%</span></span>
+                        <span class="text-gray-400">Change <span class="${color}">${((last.close - last.open) / last.open * 100).toFixed(2)}%</span></span>
                     </div>
                     <div class="flex items-center gap-3">
-                         ${lastMa7 && !isNaN(lastMa7.value) ? `<span class="text-[#F0B90B]">MA(7) ${formatPrice(lastMa7.value)}</span>` : ''}
-                         ${lastMa25 && !isNaN(lastMa25.value) ? `<span class="text-[#C026D3]">MA(25) ${formatPrice(lastMa25.value)}</span>` : ''}
-                         ${lastMa99 && !isNaN(lastMa99.value) ? `<span class="text-[#3B82F6]">MA(99) ${formatPrice(lastMa99.value)}</span>` : ''}
+                         ${lastMa1 && !isNaN(lastMa1.value) ? `<span class="text-[#F0B90B]">MA(${ma1Period}) ${formatPrice(lastMa1.value)}</span>` : ''}
+                         ${lastMa2 && !isNaN(lastMa2.value) ? `<span class="text-[#C026D3]">MA(${ma2Period}) ${formatPrice(lastMa2.value)}</span>` : ''}
+                         ${lastMa3 && !isNaN(lastMa3.value) ? `<span class="text-[#3B82F6]">MA(${ma3Period}) ${formatPrice(lastMa3.value)}</span>` : ''}
                     </div>
                     <div class="flex items-center gap-3">
                          ${lastVol ? `<span class="text-gray-400">Vol(BTC): <span class="text-gray-300">${formatVolume(lastVol.value)}</span></span>` : ''}
@@ -274,7 +275,7 @@ export function CandlestickChartWrapper({ symbol, data, loading, error }: ChartP
             `;
         }
 
-    }, [data]);
+    }, [data, ma1Period, ma2Period, ma3Period]);
 
     const formatPrice = (price: number) => price >= 1000 ? price.toFixed(2) : price.toPrecision(5);
     const formatVolume = (vol: number) => {
