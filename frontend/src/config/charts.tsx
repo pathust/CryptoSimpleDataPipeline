@@ -32,7 +32,36 @@ export const CHART_REGISTRY: ChartConfig[] = [
         dataProvider: 'candlestick',
         refreshInterval: 15000, // 15 seconds
         gridSpan: { cols: 3, rows: 2 },
-        defaultParams: { limit: 200 },
+        defaultParams: { limit: 200, ma1_period: 7, ma2_period: 25, ma3_period: 99 },
+        parameterSchema: {
+            ma1_period: {
+                label: 'MA1 Period',
+                type: 'number',
+                default: 7,
+                min: 2,
+                max: 200,
+                step: 1,
+                description: 'First moving average period'
+            },
+            ma2_period: {
+                label: 'MA2 Period',
+                type: 'number',
+                default: 25,
+                min: 2,
+                max: 200,
+                step: 1,
+                description: 'Second moving average period'
+            },
+            ma3_period: {
+                label: 'MA3 Period',
+                type: 'number',
+                default: 99,
+                min: 2,
+                max: 200,
+                step: 1,
+                description: 'Third moving average period'
+            },
+        },
     },
     {
         id: 'volume',
@@ -49,7 +78,7 @@ export const CHART_REGISTRY: ChartConfig[] = [
     },
     {
         id: 'rsi',
-        title: 'RSI (14)',
+        title: 'RSI',
         description: 'Relative Strength Index',
         category: 'indicator',
         icon: TrendingUp,
@@ -59,6 +88,17 @@ export const CHART_REGISTRY: ChartConfig[] = [
         refreshInterval: 15000,
         gridSpan: { cols: 3, rows: 1 },
         defaultParams: { period: 14, limit: 200 },
+        parameterSchema: {
+            period: {
+                label: 'Period',
+                type: 'number',
+                default: 14,
+                min: 2,
+                max: 50,
+                step: 1,
+                description: 'Number of periods for RSI calculation'
+            },
+        },
     },
     {
         id: 'macd',
@@ -72,6 +112,35 @@ export const CHART_REGISTRY: ChartConfig[] = [
         refreshInterval: 15000,
         gridSpan: { cols: 3, rows: 1 },
         defaultParams: { fast_period: 12, slow_period: 26, signal_period: 9, limit: 200 },
+        parameterSchema: {
+            fast_period: {
+                label: 'Fast Period',
+                type: 'number',
+                default: 12,
+                min: 2,
+                max: 50,
+                step: 1,
+                description: 'Fast EMA period'
+            },
+            slow_period: {
+                label: 'Slow Period',
+                type: 'number',
+                default: 26,
+                min: 2,
+                max: 100,
+                step: 1,
+                description: 'Slow EMA period'
+            },
+            signal_period: {
+                label: 'Signal Period',
+                type: 'number',
+                default: 9,
+                min: 2,
+                max: 50,
+                step: 1,
+                description: 'Signal line period'
+            },
+        },
     },
     {
         id: 'bollinger',
@@ -85,6 +154,26 @@ export const CHART_REGISTRY: ChartConfig[] = [
         refreshInterval: 15000,
         gridSpan: { cols: 3, rows: 1 },
         defaultParams: { period: 20, std_dev: 2, limit: 200 },
+        parameterSchema: {
+            period: {
+                label: 'Period',
+                type: 'number',
+                default: 20,
+                min: 5,
+                max: 100,
+                step: 1,
+                description: 'SMA period'
+            },
+            std_dev: {
+                label: 'Std Deviation',
+                type: 'number',
+                default: 2,
+                min: 0.5,
+                max: 5,
+                step: 0.1,
+                description: 'Number of standard deviations'
+            },
+        },
     },
     {
         id: 'order_book',
@@ -109,10 +198,21 @@ export const CHART_REGISTRY: ChartConfig[] = [
         refreshInterval: 15000,
         gridSpan: { cols: 3, rows: 1 },
         defaultParams: { window: 20, limit: 200, interval: '1m' },
+        parameterSchema: {
+            window: {
+                label: 'Window',
+                type: 'number',
+                default: 20,
+                min: 5,
+                max: 100,
+                step: 1,
+                description: 'Rolling window size'
+            },
+        },
     },
     {
         id: 'atr',
-        title: 'ATR (14)',
+        title: 'ATR',
         description: 'Average True Range - volatility indicator',
         category: 'indicator',
         icon: Gauge,
@@ -122,6 +222,17 @@ export const CHART_REGISTRY: ChartConfig[] = [
         refreshInterval: 15000,
         gridSpan: { cols: 3, rows: 1 },
         defaultParams: { period: 14, limit: 200 },
+        parameterSchema: {
+            period: {
+                label: 'Period',
+                type: 'number',
+                default: 14,
+                min: 2,
+                max: 50,
+                step: 1,
+                description: 'Number of periods for ATR'
+            },
+        },
     },
     {
         id: 'volume_profile',
@@ -135,6 +246,17 @@ export const CHART_REGISTRY: ChartConfig[] = [
         refreshInterval: 30000, // 30 seconds
         gridSpan: { cols: 3, rows: 2 },
         defaultParams: { bins: 20, limit: 200 },
+        parameterSchema: {
+            bins: {
+                label: 'Bins',
+                type: 'number',
+                default: 20,
+                min: 5,
+                max: 50,
+                step: 1,
+                description: 'Number of price bins'
+            },
+        },
     },
     {
         id: 'return_distribution',
@@ -148,6 +270,17 @@ export const CHART_REGISTRY: ChartConfig[] = [
         refreshInterval: 30000, // 30 seconds
         gridSpan: { cols: 3, rows: 1 },
         defaultParams: { bins: 30, limit: 200 },
+        parameterSchema: {
+            bins: {
+                label: 'Bins',
+                type: 'number',
+                default: 30,
+                min: 10,
+                max: 100,
+                step: 5,
+                description: 'Number of distribution bins'
+            },
+        },
     },
 ];
 

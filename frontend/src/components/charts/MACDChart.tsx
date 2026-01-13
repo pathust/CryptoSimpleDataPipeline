@@ -10,9 +10,10 @@ interface MACDDataPoint {
 
 interface ChartProps {
     data: MACDDataPoint[];
+    params?: Record<string, any>;
 }
 
-export function MACDChart({ data }: ChartProps) {
+export function MACDChart({ data, params = {} }: ChartProps) {
     if (!data || !Array.isArray(data) || data.length === 0) {
         return (
             <div className="flex items-center justify-center h-[300px] bg-[#0B0E11] text-gray-500 border border-[#1E2329] rounded-lg">
@@ -50,11 +51,10 @@ export function MACDChart({ data }: ChartProps) {
                         </div>
                         <div className="flex items-center justify-between gap-4">
                             <span className="text-xs text-gray-400">Histogram:</span>
-                            <span className={`text-xs font-medium ${
-                                payload.find((p: any) => p.dataKey === 'histogram')?.value >= 0 
-                                    ? 'text-[#0ECB81]' 
+                            <span className={`text-xs font-medium ${payload.find((p: any) => p.dataKey === 'histogram')?.value >= 0
+                                    ? 'text-[#0ECB81]'
                                     : 'text-[#F6465D]'
-                            }`}>
+                                }`}>
                                 {payload.find((p: any) => p.dataKey === 'histogram')?.value.toFixed(5)}
                             </span>
                         </div>
@@ -73,11 +73,11 @@ export function MACDChart({ data }: ChartProps) {
                 <div className="flex items-center gap-4 text-xs">
                     <div className="flex items-center gap-1.5">
                         <div className="w-2 h-2 rounded-full bg-[#F0B90B]"></div>
-                        <span className="text-gray-400">MACD(12,26)</span>
+                        <span className="text-gray-400">MACD({params.fast_period ?? 12},{params.slow_period ?? 26})</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <div className="w-2 h-2 rounded-full bg-[#B376F7]"></div>
-                        <span className="text-gray-400">Signal(9)</span>
+                        <span className="text-gray-400">Signal({params.signal_period ?? 9})</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <div className="w-2 h-2 rounded-sm bg-[#0ECB81] opacity-60"></div>
@@ -95,14 +95,14 @@ export function MACDChart({ data }: ChartProps) {
                             <stop offset="100%" stopColor="#F0B90B" stopOpacity={0} />
                         </linearGradient>
                     </defs>
-                    
-                    <CartesianGrid 
-                        strokeDasharray="3 3" 
-                        stroke="#1E2329" 
+
+                    <CartesianGrid
+                        strokeDasharray="3 3"
+                        stroke="#1E2329"
                         vertical={false}
                         opacity={0.5}
                     />
-                    
+
                     <XAxis
                         dataKey="time"
                         stroke="#474D57"
@@ -112,7 +112,7 @@ export function MACDChart({ data }: ChartProps) {
                         minTickGap={40}
                         tick={{ fill: '#848E9C' }}
                     />
-                    
+
                     <YAxis
                         stroke="#474D57"
                         fontSize={11}
@@ -122,7 +122,7 @@ export function MACDChart({ data }: ChartProps) {
                         tickFormatter={(value) => value.toFixed(3)}
                         width={65}
                     />
-                    
+
                     <Tooltip content={<CustomTooltip />} cursor={{ stroke: '#474D57', strokeWidth: 1 }} />
 
                     {/* Zero reference line */}
@@ -131,9 +131,9 @@ export function MACDChart({ data }: ChartProps) {
                     {/* Histogram bars with dynamic coloring */}
                     <Bar dataKey="histogram" radius={[2, 2, 0, 0]} maxBarSize={8}>
                         {chartData.map((entry, index) => (
-                            <Cell 
-                                key={`cell-${index}`} 
-                                fill={entry.histogram >= 0 ? '#0ECB81' : '#F6465D'} 
+                            <Cell
+                                key={`cell-${index}`}
+                                fill={entry.histogram >= 0 ? '#0ECB81' : '#F6465D'}
                                 opacity={0.7}
                             />
                         ))}
@@ -163,7 +163,7 @@ export function MACDChart({ data }: ChartProps) {
 
             {/* Footer info */}
             <div className="mt-3 pt-3 border-t border-[#1E2329] flex items-center justify-between text-xs text-gray-500">
-                <span>Fast: 12 | Slow: 26 | Signal: 9</span>
+                <span>Fast: {params.fast_period ?? 12} | Slow: {params.slow_period ?? 26} | Signal: {params.signal_period ?? 9}</span>
                 <span>Timeframe: 1m</span>
             </div>
         </div>
