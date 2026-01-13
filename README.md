@@ -42,6 +42,7 @@ Comprehensive documentation is available in the [`docs/`](docs/) directory:
 |----------|-------------|
 | [📐 Architecture](docs/ARCHITECTURE.md) | System design, components, and technology stack |
 | [🔄 Data Pipeline](docs/DATA_PIPELINE.md) | Complete data flow from source to visualization |
+| [📊 Charts Guide](docs/CHARTS_GUIDE.md) | Detailed guide for all charts and indicators |
 | [🔌 API Reference](docs/API_REFERENCE.md) | All API endpoints with examples |
 | [⚛️ Frontend](docs/FRONTEND.md) | React/TypeScript architecture and components |
 | [🐍 Backend](docs/BACKEND.md) | Python modules and Flask application |
