@@ -53,7 +53,16 @@ export function ChartParameterControls({
     };
 
     const handleApply = () => {
-        onApply(localParams);
+        // Convert empty strings to defaults before applying
+        const validatedParams: Record<string, any> = {};
+        Object.entries(localParams).forEach(([key, value]) => {
+            if (value === '' && parameterSchema[key]) {
+                validatedParams[key] = parameterSchema[key].default;
+            } else {
+                validatedParams[key] = value;
+            }
+        });
+        onApply(validatedParams);
         setIsOpen(false);
     };
 
@@ -116,10 +125,17 @@ export function ChartParameterControls({
                                         type="number"
                                         value={localParams[key] ?? schema.default}
                                         onChange={(e) => {
+                                            // Allow empty string during editing (intermediate state)
                                             const value = e.target.value === ''
-                                                ? schema.default
+                                                ? ''
                                                 : Number(e.target.value);
                                             handleParamChange(key, value);
+                                        }}
+                                        onBlur={(e) => {
+                                            // Revert to default if empty when focus is lost
+                                            if (e.target.value === '') {
+                                                handleParamChange(key, schema.default);
+                                            }
                                         }}
                                         min={schema.min}
                                         max={schema.max}
