@@ -108,6 +108,25 @@ class SchedulerConfig:
             except:
                 maintenance_next_run = None
         
+        # Calculate next run for retention cleanup job
+        retention_interval = self.config.get("retention_interval_seconds", 86400)  # Default 1 day
+        retention_next_run = None
+        retention_should_run = False
+        last_retention_str = self.config.get("last_retention_cleanup_run")
+        if last_retention_str:
+            try:
+                last_run = datetime.fromisoformat(last_retention_str)
+                next_run = last_run + timedelta(seconds=retention_interval)
+                
+                # Check if overdue
+                if next_run < now:
+                    retention_should_run = True
+                    retention_next_run = now.isoformat()
+                else:
+                    retention_next_run = next_run.isoformat()
+            except:
+                retention_next_run = None
+        
         jobs = [
             {
                 "id": "pipeline_job",
@@ -130,6 +149,17 @@ class SchedulerConfig:
                 "lastRun": self.config.get("last_maintenance_run"),
                 "nextRun": maintenance_next_run,
                 "shouldAutoRun": maintenance_should_run
+            },
+            {
+                "id": "retention_cleanup_job",
+                "name": "Data Lake Cleanup",
+                "description": "Remove old data from MinIO data lake based on retention policy",
+                "interval": f"{retention_interval}s",
+                "enabled": True,
+                "status": "overdue" if retention_should_run else "idle",
+                "lastRun": self.config.get("last_retention_cleanup_run"),
+                "nextRun": retention_next_run,
+                "shouldAutoRun": retention_should_run
             }
         ]
         return jobs
@@ -173,6 +203,23 @@ class SchedulerConfig:
                 self.config["maintenance_interval_seconds"] = seconds
                 self.save_config()
             return True
+        elif job_id == "retention_cleanup_job":
+            if "interval" in updates:
+                # Parse retention interval
+                interval_str = updates["interval"]
+                if interval_str.endswith('s'):
+                    seconds = int(interval_str[:-1])
+                elif interval_str.endswith('m'):
+                    seconds = int(interval_str[:-1]) * 60
+                elif interval_str.endswith('h'):
+                    seconds = int(interval_str[:-1]) * 3600
+                elif interval_str.endswith('d'):
+                    seconds = int(interval_str[:-1]) * 86400
+                else:
+                    seconds = int(interval_str)
+                self.config["retention_interval_seconds"] = seconds
+                self.save_config()
+            return True
         return False
     
     def mark_job_run(self, job_id):
@@ -181,5 +228,7 @@ class SchedulerConfig:
             self.config["last_pipeline_run"] = datetime.now().isoformat()
         elif job_id == "maintenance_job":
             self.config["last_maintenance_run"] = datetime.now().isoformat()
+        elif job_id == "retention_cleanup_job":
+            self.config["last_retention_cleanup_run"] = datetime.now().isoformat()
         self.save_config()
         return True

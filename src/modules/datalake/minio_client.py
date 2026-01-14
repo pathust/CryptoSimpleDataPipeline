@@ -3,6 +3,8 @@ from minio.error import S3Error
 import src.config as config
 import io
 import logging
+from urllib3.util.retry import Retry
+from urllib3 import PoolManager
 
 logger = logging.getLogger(__name__)
 
@@ -14,11 +16,27 @@ class MinioClient:
     
     def __init__(self):
         """Initialize MinIO client and ensure buckets exist."""
+        # Configure retry strategy to handle disk space issues
+        retry_strategy = Retry(
+            total=10,  # Increased from default 5
+            backoff_factor=2,  # Exponential backoff
+            status_forcelist=[500, 502, 503, 504],  # Retry on server errors
+            allowed_methods=["HEAD", "GET", "PUT", "DELETE", "OPTIONS", "TRACE"]
+        )
+        
+        # Create HTTP client with retry strategy
+        http_client = PoolManager(
+            timeout=30.0,  # Increased timeout
+            maxsize=10,
+            retries=retry_strategy
+        )
+        
         self.client = Minio(
             config.MINIO_ENDPOINT,
             access_key=config.MINIO_ACCESS_KEY,
             secret_key=config.MINIO_SECRET_KEY,
-            secure=config.MINIO_SECURE
+            secure=config.MINIO_SECURE,
+            http_client=http_client
         )
         
         self.bucket_raw = config.MINIO_BUCKET_RAW

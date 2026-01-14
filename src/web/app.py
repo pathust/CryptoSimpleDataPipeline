@@ -12,6 +12,7 @@ from src.modules.extract.manager import ExtractionManager
 from src.modules.transform.manager import TransformManager
 from src.modules.visualize.service import VisualizeService
 from src.modules.analytics.service import AnalyticsService
+from src.modules.datalake.retention_manager import RetentionManager
 from src.scheduler_config import SchedulerConfig
 import src.config as config
 
@@ -35,6 +36,7 @@ extract_mgr = ExtractionManager()
 transform_mgr = TransformManager()
 visualize_svc = VisualizeService()
 analytics_svc = AnalyticsService()
+retention_mgr = RetentionManager()
 
 def pipeline_job():
     """Background job to run extraction and transformation."""
@@ -66,6 +68,26 @@ def maintenance_job():
         scheduler_config.mark_job_run("maintenance_job")
     except Exception as e:
         print(f"❌ Maintenance failed: {e}")
+        import traceback
+        traceback.print_exc()
+
+def retention_cleanup_job():
+    """Daily retention cleanup: remove old data from data lake."""
+    if not config.RETENTION_CHECK_ENABLED:
+        print("⏸️  Retention cleanup disabled via config")
+        return
+    
+    print("🗑️  Running retention cleanup...")
+    try:
+        result = retention_mgr.run_retention_policy()
+        if result.get('enabled', False):
+            print(f"✅ Retention cleanup: {result['total_deleted_count']} objects deleted, "
+                  f"{result['total_freed_gb']:.2f} GB freed")
+            scheduler_config.mark_job_run("retention_cleanup_job")
+        else:
+            print("⏸️  Retention cleanup disabled")
+    except Exception as e:
+        print(f"❌ Retention cleanup failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -413,8 +435,56 @@ def run_scheduler_job(job_id):
     elif job_id == "maintenance_job":
         maintenance_job()
         return jsonify({"status": "Maintenance job triggered"})
+    elif job_id == "retention_cleanup_job":
+        retention_cleanup_job()
+        return jsonify({"status": "Retention cleanup job triggered"})
     else:
         return jsonify({"error": "Unknown job ID"}), 404
+
+@app.route('/api/datalake/cleanup', methods=['POST'])
+def trigger_datalake_cleanup():
+    """Manually trigger data lake cleanup."""
+    try:
+        result = retention_mgr.run_retention_policy()
+        return jsonify({
+            "status": "success",
+            "result": result
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
+
+@app.route('/api/datalake/stats', methods=['GET'])
+def get_datalake_stats():
+    """Get data lake statistics."""
+    try:
+        raw_size = retention_mgr.get_bucket_size()
+        archive_size = retention_mgr.get_bucket_size(config.MINIO_BUCKET_ARCHIVE)
+        
+        return jsonify({
+            "raw_bucket": {
+                "name": config.MINIO_BUCKET_RAW,
+                "size_bytes": raw_size,
+                "size_gb": raw_size / (1024**3)
+            },
+            "archive_bucket": {
+                "name": config.MINIO_BUCKET_ARCHIVE,
+                "size_bytes": archive_size,
+                "size_gb": archive_size / (1024**3)
+            },
+            "retention_policy": {
+                "enabled": config.RETENTION_CHECK_ENABLED,
+                "max_size_gb": config.RETENTION_MAX_SIZE_GB,
+                "max_age_days": config.RETENTION_MAX_AGE_DAYS
+            }
+        })
+    except Exception as e:
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500
 
 if __name__ == '__main__':
     app.run(debug=config.FLASK_DEBUG, use_reloader=False, port=config.FLASK_PORT)

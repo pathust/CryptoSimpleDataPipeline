@@ -32,3 +32,9 @@ MINIO_SECRET_KEY = os.getenv('MINIO_SECRET_KEY', 'minioadmin123')
 MINIO_BUCKET_RAW = os.getenv('MINIO_BUCKET_RAW', 'crypto-raw')
 MINIO_BUCKET_ARCHIVE = os.getenv('MINIO_BUCKET_ARCHIVE', 'crypto-archive')
 MINIO_SECURE = os.getenv('MINIO_SECURE', 'False').lower() == 'true'
+
+# Data Lake Retention Policy
+RETENTION_MAX_SIZE_GB = int(os.getenv('RETENTION_MAX_SIZE_GB', '50'))
+RETENTION_MAX_AGE_DAYS = int(os.getenv('RETENTION_MAX_AGE_DAYS', '30'))
+RETENTION_CHECK_ENABLED = os.getenv('RETENTION_CHECK_ENABLED', 'True').lower() == 'true'
+RETENTION_CLEANUP_HOUR = int(os.getenv('RETENTION_CLEANUP_HOUR', '3'))  # 3 AM
